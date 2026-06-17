@@ -269,6 +269,7 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
           <span class="r">Qty</span><span class="r">Rate (₹)</span><span class="r">Amount (₹)</span><span></span>
         </div>
         <div class="prows" id="prows"></div>
+        <datalist id="product-list"></datalist>
         <button class="addbtn" onclick="addRow()">+ Add Another Product</button>
       </div>
 
@@ -539,7 +540,7 @@ function addRow() {
   d.className="prow";d.id="pr-"+n;
   d.innerHTML=`
     <div class="rnum">${n}</div>
-    <input type="text" placeholder="Product description..." id="pd-${n}">
+    <input type="text" placeholder="Product description..." id="pd-${n}" list="product-list" autocomplete="off" oninput="autofillProduct(${n})">
     <input type="text" placeholder="HSN" id="ph-${n}">
     <input type="number" class="r" placeholder="0" id="pq-${n}" min="0" oninput="calcAmt(${n})">
     <input type="number" class="r" placeholder="0.00" id="pr2-${n}" min="0" oninput="calcAmt(${n})">
@@ -698,11 +699,12 @@ function cacheAdd(d) {
 // ═══════════════════════════════════════════════════
 let allHist=[];
 let customerDirectory={}; // name(lowercase) -> {name,mobile,location,gstin,transport,destination}
+let productDirectory={};  // desc(lowercase) -> {desc,hsn}
 
 function loadHist() {
   // Show cached first
   const cached=JSON.parse(sessionStorage.getItem("je_inv")||"[]");
-  allHist=cached; renderHist(cached); buildCustomerDirectory(cached);
+  allHist=cached; renderHist(cached); buildCustomerDirectory(cached); buildProductDirectory(cached);
   // Then fetch from sheet
   if(SCRIPT_URL==="YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") return;
   fetch(SCRIPT_URL+"?action=getInvoices")
@@ -714,6 +716,7 @@ function loadHist() {
       sessionStorage.setItem("je_inv",JSON.stringify(allHist));
       renderHist(allHist);
       buildCustomerDirectory(allHist);
+      buildProductDirectory(allHist);
     }
   })
   .catch(()=>{});
@@ -768,6 +771,47 @@ function autofillCustomer() {
   setIfEmpty("f-transport",match.transport);
   setIfEmpty("f-dest",match.destination);
   showToast("✓ Autofilled details for "+match.name,"success");
+}
+
+// ═══════════════════════════════════════════════════
+// PRODUCT DIRECTORY — same idea as customer directory,
+// but keyed by product description. Pulls Name + HSN
+// from every product line item across all past invoices.
+// Most recent invoice for a given product name wins.
+// ═══════════════════════════════════════════════════
+function buildProductDirectory(list) {
+  productDirectory={};
+  // allHist is newest-first already, so first occurrence = most recent
+  list.forEach(inv=>{
+    (inv.products||[]).forEach(p=>{
+      const desc=(p.desc||"").trim();
+      if(!desc) return;
+      const key=desc.toLowerCase();
+      if(!productDirectory[key]) {
+        productDirectory[key]={ desc:desc, hsn:p.hsn||"" };
+      }
+    });
+  });
+  // Populate the shared datalist used by every product row
+  const dl=document.getElementById("product-list");
+  if(dl) {
+    dl.innerHTML=Object.values(productDirectory)
+      .map(p=>`<option value="${p.desc.replace(/"/g,"&quot;")}">`).join("");
+  }
+}
+
+// Called on every keystroke in a product description field.
+// If the typed name exactly matches a known product, autofill its HSN.
+function autofillProduct(n) {
+  const typed=(document.getElementById("pd-"+n)?.value||"").trim().toLowerCase();
+  const match=productDirectory[typed];
+  if(!match) return;
+  const hsnEl=document.getElementById("ph-"+n);
+  // Only fill if empty, so we never overwrite something being edited
+  if(hsnEl && !hsnEl.value.trim() && match.hsn) {
+    hsnEl.value=match.hsn;
+    showToast("✓ Autofilled HSN for "+match.desc,"success");
+  }
 }
 
 function renderHist(list) {
