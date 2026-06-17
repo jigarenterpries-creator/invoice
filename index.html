@@ -151,6 +151,8 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
 .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;background:#e3eaf8;color:var(--navy)}
 .vbtn{padding:4px 12px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-weight:600}
 .vbtn:hover{background:var(--navy2)}
+.ebtn{padding:4px 12px;background:#f5c542;color:#1a1a1a;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-weight:600;margin-left:5px}
+.ebtn:hover{opacity:.85}
 .pbtn{padding:4px 12px;background:var(--orange);color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-weight:600;margin-left:5px}
 .pbtn:hover{opacity:.85}
 .wabtn{padding:4px 12px;background:#25D366;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-weight:600;margin-left:5px}
@@ -217,6 +219,11 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
   <!-- NEW INVOICE -->
   <div class="panel active" id="panel-new">
     <div class="fw">
+
+      <div class="card fw2" id="edit-banner" style="display:none;background:#fff8e1;border:1.5px solid #f5c542;align-items:center;justify-content:space-between;flex-direction:row;padding:14px 20px">
+        <span style="font-weight:700;color:#8a6d00">✏️ Editing Invoice <span id="edit-banner-no"></span> — saving will update this invoice in Google Sheets.</span>
+        <button class="btn btn-o" style="margin-left:14px" onclick="cancelEdit()">Cancel Edit</button>
+      </div>
 
       <div class="card">
         <div class="ctitle"><span>📄</span> Invoice Details</div>
@@ -641,8 +648,8 @@ function validate(d) {
 // ═══════════════════════════════════════════════════
 // CLEAR FORM
 // ═══════════════════════════════════════════════════
-function clearForm() {
-  if(!confirm("Clear all form fields?")) return;
+function clearForm(skipConfirm) {
+  if(!skipConfirm && !confirm("Clear all form fields?")) return;
   ["f-ino","f-challan","f-po","f-cname","f-cmobile","f-cloc","f-cgstin",
    "f-transport","f-dest","f-taxwords","f-notes"].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value="";
@@ -652,6 +659,8 @@ function clearForm() {
   document.getElementById("f-idate").value=new Date().toISOString().split("T")[0];
   document.getElementById("prows").innerHTML="";
   RC=0;addRow();recalc();
+  editingOriginalNo=null;
+  document.getElementById("edit-banner").style.display="none";
 }
 
 // ═══════════════════════════════════════════════════
@@ -663,25 +672,50 @@ function saveInv() {
   if(SCRIPT_URL==="YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") {
     showToast("⚠ Paste your Apps Script URL in the SCRIPT_URL variable.","error");return;
   }
+
+  // If we're editing an existing invoice and the user changed the Invoice No,
+  // the sheet match (by Invoice No) won't find the old row anymore — it would
+  // create a brand-new row and leave the old one behind. So in that specific
+  // case, delete the old row first, then save the new one.
+  const wasRenamed = editingOriginalNo && String(editingOriginalNo)!==String(d.invoiceNo);
+
   document.getElementById("loading").style.display="flex";
-  // Send the row as an ordered array — no key mismatch possible
-  const payload={action:"saveInvoice",row:toRow(d)};
-  fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify(payload)})
-  .then(r=>r.json())
-  .then(res=>{
+
+  const doSave=()=>{
+    const payload={action:"saveInvoice",row:toRow(d)};
+    return fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify(payload)}).then(r=>r.json());
+  };
+
+  const afterSave=(res)=>{
     document.getElementById("loading").style.display="none";
     if(res.status==="ok") {
-      showToast("✅ Invoice saved to Google Sheets!","success");
+      showToast(editingOriginalNo?"✅ Invoice updated in Google Sheets!":"✅ Invoice saved to Google Sheets!","success");
       cacheAdd(d);
+      if(wasRenamed) {
+        allHist=allHist.filter(i=>String(i.invoiceNo)!==String(editingOriginalNo));
+        sessionStorage.setItem("je_inv",JSON.stringify(allHist));
+      }
+      editingOriginalNo=null;
+      document.getElementById("edit-banner").style.display="none";
     } else {
       showToast("Error: "+(res.message||"Unknown"),"error");
     }
-  })
-  .catch(()=>{
+  };
+
+  const onFail=()=>{
     document.getElementById("loading").style.display="none";
     showToast("Network error. Saved locally only.","error");
     cacheAdd(d);
-  });
+    editingOriginalNo=null;
+    document.getElementById("edit-banner").style.display="none";
+  };
+
+  if(wasRenamed) {
+    fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteInvoice",invoiceNo:editingOriginalNo})})
+      .then(()=>doSave()).then(afterSave).catch(onFail);
+  } else {
+    doSave().then(afterSave).catch(onFail);
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -830,6 +864,7 @@ function renderHist(list) {
       <td><strong>₹${parseFloat(inv.grand||0).toFixed(2)}</strong></td>
       <td>
         <button class="vbtn" onclick="viewInv('${inv.invoiceNo}')">View</button>
+        <button class="ebtn" onclick="editInv('${inv.invoiceNo}')">Edit</button>
         <button class="wabtn" onclick="sendWhatsAppFor('${inv.invoiceNo}')">WhatsApp</button>
         <button class="pbtn" onclick="printInv('${inv.invoiceNo}')">Print</button>
         <button class="dbtn" onclick="delInv('${inv.invoiceNo}')">Delete</button>
@@ -930,6 +965,65 @@ function delInv(no) {
     document.getElementById("loading").style.display="none";
     showToast("Delete request failed","error");
   });
+}
+
+// ═══════════════════════════════════════════════════
+// EDIT INVOICE
+// Loads an existing invoice's data back into the New
+// Invoice form for editing. Saving afterward updates the
+// same row in Google Sheets (saveInvoice already matches
+// on Invoice No and overwrites instead of duplicating).
+// ═══════════════════════════════════════════════════
+let editingOriginalNo=null; // tracks the invoice no we loaded, in case user edits the number itself
+
+function editInv(no) {
+  const inv=findInv(no);
+  if(!inv){showToast("Invoice not found","error");return;}
+
+  switchTab("new");
+  editingOriginalNo=String(inv.invoiceNo||"");
+
+  // Basic fields
+  document.getElementById("f-ino").value=inv.invoiceNo||"";
+  document.getElementById("f-idate").value=inv.invoiceDate||"";
+  document.getElementById("f-challan").value=inv.challan||"";
+  document.getElementById("f-po").value=inv.po||"";
+  document.getElementById("f-cname").value=inv.clientName||"";
+  document.getElementById("f-cmobile").value=inv.clientMobile||"";
+  document.getElementById("f-cloc").value=inv.clientLocation||"";
+  document.getElementById("f-cgstin").value=inv.clientGstin||"";
+  document.getElementById("f-transport").value=inv.transport||"";
+  document.getElementById("f-dest").value=inv.destination||"";
+  document.getElementById("f-parcels").value=inv.parcels||1;
+  document.getElementById("f-taxwords").value=inv.taxWords||"";
+  document.getElementById("f-notes").value=inv.notes||"";
+  document.getElementById("f-packing").value=inv.packing||0;
+  document.getElementById("f-gst").value=inv.gstType||"cgst_sgst";
+
+  // Rebuild product rows from saved data
+  document.getElementById("prows").innerHTML="";
+  RC=0;
+  const products=(inv.products&&inv.products.length)?inv.products:[{}];
+  products.forEach(p=>{
+    addRow();
+    const n=RC;
+    document.getElementById("pd-"+n).value=p.desc||"";
+    document.getElementById("ph-"+n).value=p.hsn||"";
+    document.getElementById("pq-"+n).value=p.qty||"";
+    document.getElementById("pr2-"+n).value=p.rate||"";
+  });
+  recalc();
+
+  // Show the edit banner
+  document.getElementById("edit-banner-no").textContent=inv.invoiceNo||"";
+  document.getElementById("edit-banner").style.display="flex";
+
+  showToast("Loaded Invoice "+(inv.invoiceNo||"")+" for editing.","success");
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function cancelEdit() {
+  clearForm(true);
 }
 
 // ═══════════════════════════════════════════════════
