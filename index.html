@@ -123,6 +123,9 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
 .btn-s:hover{background:var(--navy2);transform:translateY(-1px)}
 .btn-o{background:#fff;color:var(--navy);border:1.5px solid var(--border)}
 .btn-o:hover{border-color:var(--navy)}
+.btn-wa{background:linear-gradient(135deg,#25D366,#1ebe57);color:#fff;
+  box-shadow:0 4px 14px rgba(37,211,102,.3)}
+.btn-wa:hover{opacity:.9;transform:translateY(-1px)}
 
 /* TOAST */
 .toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:9px;
@@ -150,6 +153,8 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
 .vbtn:hover{background:var(--navy2)}
 .pbtn{padding:4px 12px;background:var(--orange);color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-weight:600;margin-left:5px}
 .pbtn:hover{opacity:.85}
+.wabtn{padding:4px 12px;background:#25D366;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-weight:600;margin-left:5px}
+.wabtn:hover{opacity:.85}
 .dbtn{padding:4px 12px;background:#fdecea;color:var(--red);border:none;border-radius:5px;font-size:12px;cursor:pointer;font-weight:600;margin-left:5px}
 .dbtn:hover{background:#fbb}
 .empty{text-align:center;padding:55px 20px;color:var(--muted)}
@@ -227,7 +232,13 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
 
       <div class="card">
         <div class="ctitle"><span>👤</span> Customer Details</div>
-        <div class="fr s"><div class="field"><label>Customer Name*</label><input type="text" id="f-cname" placeholder="Full name or company"></div></div>
+        <div class="fr s">
+          <div class="field">
+            <label>Customer Name*</label>
+            <input type="text" id="f-cname" list="customer-list" placeholder="Type or select existing customer" oninput="autofillCustomer()" autocomplete="off">
+            <datalist id="customer-list"></datalist>
+          </div>
+        </div>
         <div class="fr">
           <div class="field"><label>Mobile</label><input type="text" id="f-cmobile" placeholder="+91 XXXXXXXXXX"></div>
           <div class="field"><label>Location / City</label><input type="text" id="f-cloc" placeholder="City, State"></div>
@@ -292,6 +303,7 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
 
       <div class="abar">
         <button class="btn btn-o" onclick="clearForm()">🗑 Clear Form</button>
+        <button class="btn btn-wa" onclick="sendWhatsApp()">📲 Send on WhatsApp</button>
         <button class="btn btn-s" onclick="previewInv()">👁 Preview Invoice</button>
         <button class="btn btn-p" onclick="saveInv()">💾 Save to Google Sheets</button>
       </div>
@@ -683,10 +695,12 @@ function cacheAdd(d) {
 // HISTORY
 // ═══════════════════════════════════════════════════
 let allHist=[];
+let customerDirectory={}; // name(lowercase) -> {name,mobile,location,gstin,transport,destination}
+
 function loadHist() {
   // Show cached first
   const cached=JSON.parse(sessionStorage.getItem("je_inv")||"[]");
-  allHist=cached; renderHist(cached);
+  allHist=cached; renderHist(cached); buildCustomerDirectory(cached);
   // Then fetch from sheet
   if(SCRIPT_URL==="YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") return;
   fetch(SCRIPT_URL+"?action=getInvoices")
@@ -697,9 +711,61 @@ function loadHist() {
       allHist=res.rows.map(fromRow);
       sessionStorage.setItem("je_inv",JSON.stringify(allHist));
       renderHist(allHist);
+      buildCustomerDirectory(allHist);
     }
   })
   .catch(()=>{});
+}
+
+// ═══════════════════════════════════════════════════
+// CUSTOMER DIRECTORY — builds dropdown + autofill data
+// from invoice history. Most recent invoice for a given
+// customer name wins (so details stay up to date).
+// ═══════════════════════════════════════════════════
+function buildCustomerDirectory(list) {
+  customerDirectory={};
+  // allHist is newest-first already, so first occurrence = most recent
+  list.forEach(inv=>{
+    const name=(inv.clientName||"").trim();
+    if(!name) return;
+    const key=name.toLowerCase();
+    if(!customerDirectory[key]) {
+      customerDirectory[key]={
+        name:name,
+        mobile:inv.clientMobile||"",
+        location:inv.clientLocation||"",
+        gstin:inv.clientGstin||"",
+        transport:inv.transport||"",
+        destination:inv.destination||""
+      };
+    }
+  });
+  // Populate the datalist
+  const dl=document.getElementById("customer-list");
+  if(dl) {
+    dl.innerHTML=Object.values(customerDirectory)
+      .map(c=>`<option value="${c.name.replace(/"/g,"&quot;")}">`).join("");
+  }
+}
+
+// Called on every keystroke in Customer Name field.
+// If the typed name exactly matches a known customer, autofill the rest.
+function autofillCustomer() {
+  const typed=document.getElementById("f-cname").value.trim().toLowerCase();
+  const match=customerDirectory[typed];
+  if(!match) return;
+  // Only fill fields that are currently empty, so we never overwrite
+  // something the user is actively editing for this invoice.
+  const setIfEmpty=(id,val)=>{
+    const el=document.getElementById(id);
+    if(el && !el.value.trim() && val) el.value=val;
+  };
+  setIfEmpty("f-cmobile",match.mobile);
+  setIfEmpty("f-cloc",match.location);
+  setIfEmpty("f-cgstin",match.gstin);
+  setIfEmpty("f-transport",match.transport);
+  setIfEmpty("f-dest",match.destination);
+  showToast("✓ Autofilled details for "+match.name,"success");
 }
 
 function renderHist(list) {
@@ -718,6 +784,7 @@ function renderHist(list) {
       <td><strong>₹${parseFloat(inv.grand||0).toFixed(2)}</strong></td>
       <td>
         <button class="vbtn" onclick="viewInv('${inv.invoiceNo}')">View</button>
+        <button class="wabtn" onclick="sendWhatsAppFor('${inv.invoiceNo}')">WhatsApp</button>
         <button class="pbtn" onclick="printInv('${inv.invoiceNo}')">Print</button>
         <button class="dbtn" onclick="delInv('${inv.invoiceNo}')">Delete</button>
       </td>
@@ -734,6 +801,57 @@ function filterHist() {
 }
 
 function findInv(no) { return allHist.find(i=>String(i.invoiceNo)===String(no)); }
+
+// ═══════════════════════════════════════════════════
+// WHATSAPP SEND
+// Opens WhatsApp (app or web) with the customer's number
+// pre-filled and a ready-made message. WhatsApp's free
+// click-to-chat link cannot attach a PDF automatically —
+// only the official paid WhatsApp Business API can do that.
+// So this opens the chat ready to go; use Print → Save as
+// PDF from the preview, then attach it in the opened chat.
+// ═══════════════════════════════════════════════════
+function cleanPhone(raw) {
+  if(!raw) return "";
+  let digits=String(raw).replace(/[^0-9]/g,"");
+  if(digits.length===10) digits="91"+digits;          // assume India if 10 digits
+  if(digits.length===11 && digits.startsWith("0")) digits="91"+digits.slice(1);
+  return digits;
+}
+
+function buildWaMessage(d) {
+  return `Hello ${d.clientName||""},\n\n`+
+    `Your invoice from ${CO.name} is ready.\n\n`+
+    `Invoice No: ${d.invoiceNo||""}\n`+
+    `Date: ${fmtDate(d.invoiceDate)}\n`+
+    `Grand Total: ₹${parseFloat(d.grand||0).toFixed(2)}\n\n`+
+    `We'll share the PDF copy right after this message.\n\n`+
+    `Thank you for your business!\n${CO.name}\n${CO.phone}`;
+}
+
+function openWhatsApp(d) {
+  const phone=cleanPhone(d.clientMobile);
+  if(!phone) {
+    showToast("⚠ No mobile number for this customer.","error");
+    return;
+  }
+  const msg=encodeURIComponent(buildWaMessage(d));
+  window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
+}
+
+// Called from the "Send on WhatsApp" button on the New Invoice form
+function sendWhatsApp() {
+  const d=collect();
+  if(!validate(d)) return;
+  openWhatsApp(d);
+}
+
+// Called from the "WhatsApp" button on a History row
+function sendWhatsAppFor(no) {
+  const inv=findInv(no);
+  if(!inv){showToast("Invoice not found","error");return;}
+  openWhatsApp(inv);
+}
 
 function viewInv(no) {
   const inv=findInv(no);
