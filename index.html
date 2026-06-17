@@ -467,14 +467,16 @@ function fromRow(r) {
 function parseProducts(str) {
   if (!str) return [];
   return str.split(" ;; ").map((p,i) => {
+    const segs = p.split(" | ");
+    const desc = (segs[0] || "").trim();
     const parts = {};
-    p.split(" | ").forEach(s => {
+    segs.slice(1).forEach(s => {
       const [k,...v] = s.split(":");
       if(k && v.length) parts[k.trim()] = v.join(":").trim();
     });
     return {
       sr: i+1,
-      desc: parts[""] || p,   // first segment has no key
+      desc: desc || p,
       hsn: parts["HSN"] || "",
       qty: parts["Qty"] || "",
       rate: parts["Rate"] || "",
@@ -930,8 +932,7 @@ function buildHTML(d) {
     .div{border-top:2px solid var(--pc);margin:20px 0}
     .hg{display:grid;grid-template-columns:40% 60%;align-items:start;margin-bottom:25px}
     .bl{padding-right:20px}
-    .logo{width:200px;height:auto;max-height:80px;object-fit:contain;background:#fff;
-  border:1px solid #ddd;border-radius:6px;padding:8px;margin-bottom:10px}
+    .logo{width:200px;height:auto;max-height:80px;object-fit:contain;margin-bottom:10px}
     .cm{font-size:12px;margin-top:8px}
     .cr2{text-align:right;font-size:13px;color:var(--sc)}
     .cr2 h1{color:var(--pc);font-size:24px;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px}
