@@ -259,12 +259,12 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
           <div class="field"><label>Transport / Via*</label><input type="text" id="f-transport" placeholder="Transport name"></div>
           <div class="field"><label>Destination</label><input type="text" id="f-dest" placeholder="Delivery location"></div>
         </div>
-        <div class="fr s"><div class="field"><label>Total Parcels (NOS)</label><input type="number" id="f-parcels" value="1" min="1"></div></div>
+        <div class="fr s"><div class="field"><label>Total Parcels (NOS)</label><input type="text" inputmode="numeric" pattern="[0-9]*" id="f-parcels" value="1" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div></div>
       </div>
 
       <div class="card">
         <div class="ctitle"><span>🧾</span> Notes</div>
-        <div class="fr s"><div class="field"><label>Tax Amount in Words</label><input type="text" id="f-taxwords" placeholder="e.g. Five Thousand Four Hundred Only"></div></div>
+        <div class="fr s"><div class="field"><label>Grand Total in Words</label><input type="text" id="f-taxwords" readonly placeholder="Auto-fills based on Grand Total" style="background:#eef0f6;color:var(--muted)"></div></div>
         <div class="fr s"><div class="field"><label>Internal Notes / Description</label><textarea id="f-notes" placeholder="Any notes..."></textarea></div></div>
       </div>
 
@@ -599,6 +599,8 @@ function recalc() {
   document.getElementById("t-sgst").textContent="₹"+sgst.toFixed(2);
   document.getElementById("t-igst").textContent="₹"+igst.toFixed(2);
   document.getElementById("t-grand").textContent="₹"+grand.toFixed(2);
+  const twEl=document.getElementById("f-taxwords");
+  if(twEl) twEl.value=grandTotalToWords(grand);
   const cs=gst==="cgst_sgst";
   document.getElementById("r-cgst").style.display=cs?"":"none";
   document.getElementById("r-sgst").style.display=cs?"":"none";
@@ -651,7 +653,7 @@ function validate(d) {
 function clearForm(skipConfirm) {
   if(!skipConfirm && !confirm("Clear all form fields?")) return;
   ["f-ino","f-challan","f-po","f-cname","f-cmobile","f-cloc","f-cgstin",
-   "f-transport","f-dest","f-taxwords","f-notes"].forEach(id=>{
+   "f-transport","f-dest","f-notes"].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value="";
   });
   document.getElementById("f-packing").value="0";
@@ -1151,7 +1153,7 @@ function buildHTML(d) {
     </div>
     <div class="bs">
       <div>
-        <div class="wb"><strong>Tax Amount in Words:</strong><br>${d.taxWords||"—"} Only</div>
+        <div class="wb"><strong>Grand Total in Words:</strong><br>${d.taxWords||"—"}</div>
         <div class="nb"><strong>Description / Internal Notes:</strong><br>${d.notes||"—"}</div>
       </div>
       <div class="fsb">
@@ -1189,5 +1191,46 @@ function showToast(msg,type="success") {
   t.textContent=msg;t.className="toast "+type;t.style.display="block";
   setTimeout(()=>t.style.display="none",3500);
 }
+
+// ═══════════════════════════════════════════════════
+// NUMBER → WORDS (Indian numbering: Lakh / Crore)
+// Used to auto-fill "Grand Total in Words" on the invoice.
+// ═══════════════════════════════════════════════════
+const NW_ONES=["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine",
+  "Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
+const NW_TENS=["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+
+function nwBelowThousand(n) {
+  let s="";
+  if(n>=100){ s+=NW_ONES[Math.floor(n/100)]+" Hundred "; n%=100; }
+  if(n>=20){ s+=NW_TENS[Math.floor(n/10)]+" "; n%=10; }
+  if(n>0){ s+=NW_ONES[n]+" "; }
+  return s;
+}
+
+function numberToWordsIndian(num) {
+  num=Math.floor(num);
+  if(num===0) return "Zero";
+  let s="";
+  const crore=Math.floor(num/10000000); num%=10000000;
+  const lakh=Math.floor(num/100000); num%=100000;
+  const thousand=Math.floor(num/1000); num%=1000;
+  const rest=num;
+  if(crore) s+=nwBelowThousand(crore)+"Crore ";
+  if(lakh) s+=nwBelowThousand(lakh)+"Lakh ";
+  if(thousand) s+=nwBelowThousand(thousand)+"Thousand ";
+  if(rest) s+=nwBelowThousand(rest);
+  return s.trim();
+}
+
+function grandTotalToWords(amount) {
+  amount=parseFloat(amount)||0;
+  const rupees=Math.floor(amount);
+  const paise=Math.round((amount-rupees)*100);
+  let words="Rupees "+numberToWordsIndian(rupees);
+  if(paise>0) words+=" and "+numberToWordsIndian(paise)+" Paise";
+  return words+" Only";
+}
+
 </script>
 </body></html>
