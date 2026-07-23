@@ -1273,7 +1273,7 @@ function buildHTML(d) {
         <div class="mr"><span class="ml">Date:</span><span class="mv">${fmtDate(d.invoiceDate)}</span></div>
         <div class="mr"><span class="ml">Dispatched Via:</span><span class="mv em">${d.transport||""}</span></div>
         <div class="mr"><span class="ml">Destination:</span><span class="mv em">${d.destination||""}</span></div>
-        <div class="mr"><span class="ml">Total Parcels:</span><span class="mv" style="font-size:24px;font-weight:800;color:#000">${d.parcels||1} NOS</span></div>
+        <div class="mr"><span class="ml">Total Parcels:</span><span class="mv" style="font-size:20px;font-weight:800;color:#000">${d.parcels||1} NOS</span></div>
         ${d.challan?`<div class="mr"><span class="ml">Delivery Challan:</span><span class="mv">${d.challan}</span></div>`:""}
         ${d.po?`<div class="mr"><span class="ml">Buyer PO No:</span><span class="mv">${d.po}</span></div>`:""}
       </div>
@@ -1286,6 +1286,10 @@ function buildHTML(d) {
       </tr></thead>
       <tbody>${prods}</tbody>
     </table>
+    <div class="msb">
+      <span>SHIPMENT MANIFEST SUMMARY:</span>
+      <span style="font-size:15px;font-weight:800;color:#000;letter-spacing:.3px">TOTAL PACKAGES / PARCELS: ${d.parcels||1} NOS</span>
+    </div>
     <div class="bs">
       <div>
         <div class="wb"><strong>Grand Total in Words:</strong><br>${d.taxWords||"—"}</div>
