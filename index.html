@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Jigar Enterprise — Invoice System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <style>
 :root{
   --navy:#1a2744;--navy2:#243360;--orange:#e8681a;--ora2:#f47c30;
@@ -185,6 +186,45 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
 .mprint{background:var(--orange);color:#fff;border:none;border-radius:6px;
   padding:6px 14px;cursor:pointer;font-size:13px;font-weight:600}
 #pif{width:100%;height:88vh;border:none;display:block}
+
+/* ═══ MOBILE / SMALL SCREENS (added — desktop styles untouched) ═══ */
+@media(max-width:900px){
+  .topbar{padding:0 10px;height:auto;min-height:56px;flex-wrap:wrap;row-gap:4px}
+  .tlogo{width:104px}
+  .ttitle{display:none}
+  .tbr{overflow-x:auto;padding:6px 0;max-width:100%}
+  .tabBtn,.logoutBtn{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:6px 10px}
+  .panel{padding:14px 10px}
+  .fw{grid-template-columns:1fr;gap:14px}
+  .card{padding:14px 12px;overflow-x:auto}
+  .fr,.fr.t{grid-template-columns:1fr}
+  /* totals blocks use an inline 2-col grid — collapse it on mobile */
+  div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
+  /* product rows keep their full grid; card scrolls sideways */
+  .ph,.prow{min-width:700px}
+  .prows{overflow:visible!important;border-left:none;border-right:none;border-radius:0}
+  .prow{border-left:1.5px solid var(--border);border-right:1.5px solid var(--border)}
+  .prow:last-child{border-radius:0 0 7px 7px}
+  /* history tables scroll sideways */
+  .htw{overflow-x:auto}
+  .htable{min-width:720px}
+  .htbar{flex-wrap:wrap;gap:10px}
+  .hsearch{width:100%;flex:1 1 200px}
+  /* action buttons wrap instead of overflowing */
+  .abar{flex-wrap:wrap}
+  .abar .btn{flex:1 1 44%;padding:11px 10px}
+  /* edit banners stack vertically */
+  #edit-banner,#quot-edit-banner{flex-direction:column!important;align-items:flex-start!important;gap:8px}
+  #edit-banner .btn,#quot-edit-banner .btn{margin-left:0!important}
+  /* preview modal fills small screens */
+  .moverlay{padding:6px}
+  .mbox{border-radius:8px}
+  #pif{height:78vh}
+  .mtbar{padding:10px 12px;flex-wrap:wrap;gap:8px}
+  /* login box + toast breathe on tiny screens */
+  .lbox{width:92vw;max-width:370px;padding:30px 22px 26px}
+  .toast{left:12px;right:12px;bottom:14px;text-align:center}
+}
 </style>
 </head>
 <body>
@@ -261,7 +301,7 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
           <div class="field"><label>Transport / Via*</label><input type="text" id="f-transport" placeholder="Transport name"></div>
           <div class="field"><label>Destination</label><input type="text" id="f-dest" placeholder="Delivery location"></div>
         </div>
-        <div class="fr s"><div class="field"><label>Total Parcels (NOS)</label><input type="text" inputmode="numeric" pattern="[0-9]*" id="f-parcels" value="1" oninput="this.value=this.value.replace(/[^0-9]/g,'' style="font-size: 80px;)"></div></div>
+        <div class="fr s"><div class="field"><label>Total Parcels (NOS)</label><input type="text" inputmode="numeric" pattern="[0-9]*" id="f-parcels" value="1" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div></div>
       </div>
 
       <div class="card">
@@ -326,7 +366,10 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
     <div class="hwrap">
       <div class="htbar">
         <div class="htitle">Invoice History</div>
-        <input class="hsearch" id="hsearch" placeholder="Search invoice no or customer..." oninput="filterHist()">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button class="vbtn" style="padding:8px 14px;font-size:13px" title="Download the listed invoices as an Excel file" onclick="exportInvExcel()">⬇ Export Excel</button>
+          <input class="hsearch" id="hsearch" placeholder="Search invoice no or customer..." oninput="filterHist()">
+        </div>
       </div>
       <div class="htw">
         <table class="htable">
@@ -343,7 +386,6 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
       </div>
     </div>
   </div>
-</div>
 
 <!-- QUOTATION FORM -->
 <div class="panel" id="panel-quot">
@@ -379,7 +421,10 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
         <div class="field"><label>Delivery Address</label><textarea id="q-addr" placeholder="Full delivery address..." style="min-height:52px"></textarea></div>
       </div>
       <div class="fr">
+        <div class="field"><label>Customer Mobile (for WhatsApp)</label><input type="text" id="q-cmobile" placeholder="+91 XXXXXXXXXX"></div>
         <div class="field"><label>Customer GSTIN (optional)</label><input type="text" id="q-cgstin" placeholder="GSTIN if applicable"></div>
+      </div>
+      <div class="fr s">
         <div class="field"><label>Kind Attention</label><input type="text" id="q-attn" placeholder="e.g. Procurement Desk"></div>
       </div>
     </div>
@@ -457,7 +502,10 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
   <div class="hwrap">
     <div class="htbar">
       <div class="htitle">Quotation History</div>
-      <input class="hsearch" id="qhsearch" placeholder="Search quotation no or customer..." oninput="filterQHist()">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="vbtn" style="padding:8px 14px;font-size:13px" title="Download the listed quotations as an Excel file" onclick="exportQuotExcel()">⬇ Export Excel</button>
+        <input class="hsearch" id="qhsearch" placeholder="Search quotation no or customer..." oninput="filterQHist()">
+      </div>
     </div>
     <div class="htw">
       <table class="htable">
@@ -474,6 +522,8 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
     </div>
   </div>
 </div>
+</div>
+
 <div class="loverlay" id="loading">
   <div class="lbox2"><div class="spin"></div>Saving to Google Sheets...</div>
 </div>
@@ -485,7 +535,7 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
 <div class="moverlay" id="modal">
   <div class="mbox">
     <div class="mtbar">
-      <span>Invoice Preview</span>
+      <span id="mtitle">Invoice Preview</span>
       <div class="mtbtns">
         <button class="mprint" onclick="printIframe()">🖨 Print / Save PDF</button>
         <button class="mclose" onclick="closeModal()">✕ Close</button>
@@ -632,7 +682,7 @@ function doLogin() {
      document.getElementById("lp").value===CREDS.p) {
     document.getElementById("ls").style.display="none";
     document.getElementById("app").style.display="block";
-    initForm(); loadHist(); initQForm();
+    initForm(); loadHist(); initQForm(); loadQHist();
   } else {
     const e=document.getElementById("lerr");
     e.style.display="block";
@@ -647,6 +697,7 @@ function doLogout() {
 }
 document.addEventListener("keydown",e=>{
   if(e.key==="Enter" && document.getElementById("ls").style.display!=="none") doLogin();
+  if(e.key==="Escape" && document.getElementById("modal").classList.contains("open")) closeModal();
 });
 
 // ═══════════════════════════════════════════════════
@@ -659,6 +710,7 @@ function switchTab(t) {
   });
   document.getElementById("panel-"+t).classList.add("active");
   document.getElementById("tab-"+t).classList.add("active");
+  window.scrollTo(0,0);
   if(t==="history") loadHist();
   if(t==="qhist") loadQHist();
 }
@@ -668,7 +720,7 @@ function switchTab(t) {
 // ═══════════════════════════════════════════════════
 let RC=0;
 function initForm() {
-  document.getElementById("f-idate").value=new Date().toISOString().split("T")[0];
+  document.getElementById("f-idate").value=todayLocal();
   document.getElementById("prows").innerHTML="";
   RC=0; addRow();
 }
@@ -789,11 +841,12 @@ function clearForm(skipConfirm) {
   });
   document.getElementById("f-packing").value="0";
   document.getElementById("f-parcels").value="1";
-  document.getElementById("f-idate").value=new Date().toISOString().split("T")[0];
+  document.getElementById("f-idate").value=todayLocal();
   document.getElementById("prows").innerHTML="";
   RC=0;addRow();recalc();
   editingOriginalNo=null;
   document.getElementById("edit-banner").style.display="none";
+  suggestNo("f-ino",allHist,"invoiceNo");
 }
 
 // ═══════════════════════════════════════════════════
@@ -806,10 +859,17 @@ function saveInv() {
     showToast("⚠ Paste your Apps Script URL in the SCRIPT_URL variable.","error");return;
   }
 
+  // The sheet silently overwrites a row when the Invoice No already exists.
+  // Make that an explicit choice instead of an accident.
+  const overwriting=allHist.some(i=>String(i.invoiceNo)===String(d.invoiceNo)) &&
+                    String(editingOriginalNo||"")!==String(d.invoiceNo);
+  if(overwriting &&
+     !confirm("⚠ Invoice "+d.invoiceNo+" already exists.\n\nSaving will OVERWRITE that invoice with this one. Continue?")) return;
+
   // If we're editing an existing invoice and the user changed the Invoice No,
   // the sheet match (by Invoice No) won't find the old row anymore — it would
   // create a brand-new row and leave the old one behind. So in that specific
-  // case, delete the old row first, then save the new one.
+  // case, delete the old-numbered row after the new one is safely saved.
   const wasRenamed = editingOriginalNo && String(editingOriginalNo)!==String(d.invoiceNo);
 
   document.getElementById("loading").style.display="flex";
@@ -844,8 +904,15 @@ function saveInv() {
   };
 
   if(wasRenamed) {
-    fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteInvoice",invoiceNo:editingOriginalNo})})
-      .then(()=>doSave()).then(afterSave).catch(onFail);
+    // Save the new number FIRST (a failed save leaves the original row
+    // untouched), then remove the old-numbered row.
+    doSave().then(res=>{
+      if(res.status==="ok") {
+        fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteInvoice",invoiceNo:editingOriginalNo})})
+          .catch(()=>showToast("Saved, but old row "+editingOriginalNo+" could not be removed — please delete it from History.","error"))
+          .finally(()=>afterSave(res));
+      } else afterSave(res);
+    }).catch(onFail);
   } else {
     doSave().then(afterSave).catch(onFail);
   }
@@ -859,6 +926,10 @@ function cacheAdd(d) {
   const idx=list.findIndex(x=>x.invoiceNo===d.invoiceNo);
   if(idx>=0)list[idx]=d; else list.unshift(d);
   sessionStorage.setItem("je_inv",JSON.stringify(list));
+  // Keep in-memory history in sync so overwrite warnings, the history
+  // table and exports see the save without waiting for a sheet reload.
+  allHist=allHist.filter(x=>String(x.invoiceNo)!==String(d.invoiceNo));
+  allHist.unshift(d);
 }
 
 // ═══════════════════════════════════════════════════
@@ -877,14 +948,20 @@ function loadHist() {
   fetch(SCRIPT_URL+"?action=getInvoices")
   .then(r=>r.json())
   .then(res=>{
-    if(res.status==="ok" && res.rows && res.rows.length) {
+    // Trust the server whenever it answers — even with ZERO rows — so
+    // deletions made on another device are reflected here too.
+    if(res.status==="ok" && Array.isArray(res.rows)) {
       // rows come as arrays — convert using fromRow()
       allHist=res.rows.map(fromRow);
+      // Sheets append at the bottom; show newest first so history and the
+      // autofill directories always prefer the most recent data.
+      allHist.sort((a,b)=>(Date.parse(b.timestamp)||0)-(Date.parse(a.timestamp)||0));
       sessionStorage.setItem("je_inv",JSON.stringify(allHist));
       renderHist(allHist);
       buildCustomerDirectory(allHist);
       buildProductDirectory(allHist);
-      if(typeof buildQProductDirectory==="function") buildQProductDirectory([]);
+      if(typeof buildQProductDirectory==="function") buildQProductDirectory(allQHist||[]);
+      if(!editingOriginalNo) suggestNo("f-ino",allHist,"invoiceNo");
     }
   })
   .catch(()=>{});
@@ -917,7 +994,7 @@ function buildCustomerDirectory(list) {
   const dl=document.getElementById("customer-list");
   if(dl) {
     dl.innerHTML=Object.values(customerDirectory)
-      .map(c=>`<option value="${c.name.replace(/"/g,"&quot;")}">`).join("");
+      .map(c=>`<option value="${esc(c.name)}">`).join("");
   }
   refreshQCustomerList();
 }
@@ -965,7 +1042,7 @@ function buildProductDirectory(list) {
   const dl=document.getElementById("product-list");
   if(dl) {
     dl.innerHTML=Object.values(productDirectory)
-      .map(p=>`<option value="${p.desc.replace(/"/g,"&quot;")}">`).join("");
+      .map(p=>`<option value="${esc(p.desc)}">`).join("");
   }
 }
 
@@ -991,18 +1068,18 @@ function renderHist(list) {
   }
   tb.innerHTML=list.map(inv=>`
     <tr>
-      <td><span class="badge">${inv.invoiceNo||"—"}</span></td>
-      <td>${fmtDate(inv.invoiceDate)}</td>
-      <td><strong>${inv.clientName||"—"}</strong></td>
-      <td>${inv.clientLocation||"—"}</td>
-      <td>${inv.transport||"—"}</td>
+      <td><span class="badge">${esc(inv.invoiceNo)||"—"}</span></td>
+      <td>${esc(fmtDate(inv.invoiceDate))}</td>
+      <td><strong>${esc(inv.clientName)||"—"}</strong></td>
+      <td>${esc(inv.clientLocation)||"—"}</td>
+      <td>${esc(inv.transport)||"—"}</td>
       <td><strong>₹${parseFloat(inv.grand||0).toFixed(2)}</strong></td>
       <td>
-        <button class="vbtn" onclick="viewInv('${inv.invoiceNo}')">View</button>
-        <button class="ebtn" onclick="editInv('${inv.invoiceNo}')">Edit</button>
-        <button class="wabtn" onclick="sendWhatsAppFor('${inv.invoiceNo}')">WhatsApp</button>
-        <button class="pbtn" onclick="printInv('${inv.invoiceNo}')">Print</button>
-        <button class="dbtn" onclick="delInv('${inv.invoiceNo}')">Delete</button>
+        <button class="vbtn" onclick="viewInv('${escArg(inv.invoiceNo)}')">View</button>
+        <button class="ebtn" onclick="editInv('${escArg(inv.invoiceNo)}')">Edit</button>
+        <button class="wabtn" onclick="sendWhatsAppFor('${escArg(inv.invoiceNo)}')">WhatsApp</button>
+        <button class="pbtn" onclick="printInv('${escArg(inv.invoiceNo)}')">Print</button>
+        <button class="dbtn" onclick="delInv('${escArg(inv.invoiceNo)}')">Delete</button>
       </td>
     </tr>`).join("");
 }
@@ -1072,6 +1149,7 @@ function sendWhatsAppFor(no) {
 function viewInv(no) {
   const inv=findInv(no);
   if(!inv){showToast("Invoice not found","error");return;}
+  document.getElementById("mtitle").textContent="Invoice Preview";
   document.getElementById("pif").srcdoc=buildHTML(inv);
   document.getElementById("modal").classList.add("open");
 }
@@ -1126,6 +1204,8 @@ function editInv(no) {
   if(/^\d{2}\/\d{2}\/\d{4}$/.test(rawDate)) {
     const [dd,mm,yyyy] = rawDate.split("/");
     normDate = `${yyyy}-${mm}-${dd}`;
+  } else if(/^\d{4}-\d{2}-\d{2}T/.test(rawDate)) {
+    normDate = rawDate.slice(0,10);   // ISO datetime → date part only
   }
   document.getElementById("f-idate").value=normDate;
   document.getElementById("f-challan").value=inv.challan||"";
@@ -1175,6 +1255,7 @@ function cancelEdit() {
 function previewInv() {
   const d=collect();
   if(!validate(d)) return;
+  document.getElementById("mtitle").textContent="Invoice Preview";
   document.getElementById("pif").srcdoc=buildHTML(d);
   document.getElementById("modal").classList.add("open");
 }
@@ -1331,6 +1412,73 @@ function showToast(msg,type="success") {
   setTimeout(()=>t.style.display="none",3500);
 }
 
+// Local calendar date as YYYY-MM-DD (toISOString is UTC, which can be a day
+// ahead/behind the shop's calendar early in the morning)
+function todayLocal(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
+
+// HTML-escape a value before injecting it into markup
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+// Value used inside an inline onclick="fn('...')" handler:
+// escape for the JS string literal first, then for the HTML attribute.
+function escArg(s){return esc(String(s==null?"":s).replace(/\\/g,"\\\\").replace(/'/g,"\\'"));}
+
+// Pad-preserving increment: "JE/2526/007" → "JE/2526/008"
+function suggestNextNo(no){
+  const m=String(no).match(/^(.*?)(\d+)$/);
+  if(!m) return "";
+  return m[1]+String(Number(m[2])+1).padStart(m[2].length,"0");
+}
+// Fills an EMPTY number field with the next number after the most recent
+// entry in the list. Never overwrites something the user already typed.
+function suggestNo(elId,list,key){
+  const el=document.getElementById(elId);
+  if(!el||el.value.trim()) return;
+  const latest=(list||[]).find(x=>/\d+$/.test(String(x[key]||"")));
+  if(latest) el.value=suggestNextNo(latest[key]);
+}
+
+// ─── EXCEL EXPORT (exports exactly what the history table shows) ───
+function exportToXlsx(rows,sheetName,fileName){
+  if(typeof XLSX==="undefined"){showToast("Excel library not loaded — check internet and refresh.","error");return;}
+  if(!rows.length){showToast("Nothing to export.","error");return;}
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws["!cols"]=Object.keys(rows[0]).map(k=>({wch:Math.max(12,Math.min(32,k.length+4))}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,sheetName);
+  XLSX.writeFile(wb,fileName);
+}
+function exportInvExcel(){
+  const q=(document.getElementById("hsearch").value||"").toLowerCase();
+  const list=allHist.filter(i=>
+    (i.invoiceNo||"").toLowerCase().includes(q)||
+    (i.clientName||"").toLowerCase().includes(q)||
+    (i.transport||"").toLowerCase().includes(q));
+  exportToXlsx(list.map(d=>({
+    "Invoice No":d.invoiceNo,"Date":fmtDate(d.invoiceDate),"Customer":d.clientName,
+    "Mobile":d.clientMobile,"Location":d.clientLocation,"GSTIN":d.clientGstin,
+    "Transport":d.transport,"Destination":d.destination,"Parcels":d.parcels,
+    "Challan No":d.challan,"Buyer PO":d.po,"GST Type":d.gstType,
+    "Taxable (₹)":(+d.taxable||0).toFixed(2),"Packing (₹)":(+d.packing||0).toFixed(2),
+    "CGST (₹)":(+d.cgst||0).toFixed(2),"SGST (₹)":(+d.sgst||0).toFixed(2),"IGST (₹)":(+d.igst||0).toFixed(2),
+    "Grand Total (₹)":(+d.grand||0).toFixed(2),"Amount in Words":d.taxWords,"Notes":d.notes
+  })),"Invoices","jigar-invoices-"+todayLocal()+".xlsx");
+}
+function exportQuotExcel(){
+  const q=(document.getElementById("qhsearch").value||"").toLowerCase();
+  const list=allQHist.filter(i=>
+    (i.quotNo||"").toLowerCase().includes(q)||
+    (i.cname||"").toLowerCase().includes(q));
+  exportToXlsx(list.map(d=>({
+    "Quotation No":d.quotNo,"Date":fmtDate(d.date),"Customer":d.cname,
+    "Mobile":d.cmobile,"Delivery Address":d.addr,"GSTIN":d.cgstin,
+    "Kind Attention":d.attn,"RFQ Ref":d.rfq,"Validity":d.validity,
+    "GST Type":d.gstType,"Subtotal (₹)":(+d.subtotal||0).toFixed(2),
+    "P&F":d.pfType==="extra"?(+d.pfAmt||0).toFixed(2):"Included",
+    "CGST (₹)":(+d.cgst||0).toFixed(2),"SGST (₹)":(+d.sgst||0).toFixed(2),"IGST (₹)":(+d.igst||0).toFixed(2),
+    "Net Value (₹)":(+d.grand||0).toFixed(2),"Amount in Words":d.amtWords,"Terms":d.terms
+  })),"Quotations","jigar-quotations-"+todayLocal()+".xlsx");
+}
+
 // ═══════════════════════════════════════════════════
 // NUMBER → WORDS (Indian numbering: Lakh / Crore)
 // Used to auto-fill "Grand Total in Words" on the invoice.
@@ -1394,11 +1542,12 @@ const QCOLS = [
   "IGST",            // 16
   "Grand Total",     // 17
   "Amount in Words", // 18
-  "Terms"            // 19
+  "Terms",           // 19
+  "Customer Mobile"  // 20  (appended at the END — never reorder the others)
 ];
 
 function toQRow(d) {
-  return [
+  const row=[
     d.timestamp, d.quotNo, d.date,
     d.cname, d.addr, d.cgstin, d.attn,
     d.rfq, d.validity, d.gstType,
@@ -1407,6 +1556,11 @@ function toQRow(d) {
     d.cgst, d.sgst, d.igst, d.grand,
     d.amtWords, d.terms
   ];
+  // "Customer Mobile" is the 21st column. It is appended only when filled,
+  // so an older Apps Script that writes a fixed 20-column range keeps working
+  // until the matching header is added at the end of the Quotations sheet.
+  if(d.cmobile) row.push(d.cmobile);
+  return row;
 }
 
 function fromQRow(r) {
@@ -1431,6 +1585,7 @@ function fromQRow(r) {
     grand:       parseFloat(r[17])||0,
     amtWords:    r[18]||"",
     terms:       r[19]||"",
+    cmobile:     r[20]||"",
     products:    parseQProducts(r[10]||"")
   };
 }
@@ -1462,7 +1617,7 @@ let QRC=0;
 let qEditingOriginalNo=null;
 
 function initQForm() {
-  document.getElementById("q-date").value=new Date().toISOString().split("T")[0];
+  document.getElementById("q-date").value=todayLocal();
   document.getElementById("q-prows").innerHTML="";
   QRC=0; addQRow();
   recalcQ();
@@ -1521,7 +1676,7 @@ function recalcQ() {
   const pfType=document.getElementById("q-pf")?.value||"included";
   const pfAmt=pfType==="extra"?(parseFloat(document.getElementById("q-pf-amt")?.value)||0):0;
   document.getElementById("q-pf-amt-row").style.display=pfType==="extra"?"":"none";
-  const gst=document.getElementById("q-gst")?.value||"igst";
+  const gst=document.getElementById("q-gst")?.value||"cgst_sgst";
   const taxBase=subtotal+pfAmt;
   let cgst=0,sgst=0,igst=0;
   if(gst==="cgst_sgst"){cgst=taxBase*.09;sgst=taxBase*.09;}
@@ -1553,6 +1708,7 @@ function collectQ() {
     quotNo:    document.getElementById("q-no").value.trim(),
     date:      document.getElementById("q-date").value,
     cname:     document.getElementById("q-cname").value.trim(),
+    cmobile:   document.getElementById("q-cmobile").value.trim(),
     addr:      document.getElementById("q-addr").value.trim(),
     cgstin:    document.getElementById("q-cgstin").value.trim(),
     attn:      document.getElementById("q-attn").value.trim(),
@@ -1577,16 +1733,17 @@ function validateQ(d) {
 // ─── CLEAR QUOT FORM ───
 function clearQForm(skipConfirm) {
   if(!skipConfirm && !confirm("Clear all quotation fields?")) return;
-  ["q-no","q-rfq","q-validity","q-cname","q-addr","q-cgstin","q-attn","q-terms"].forEach(id=>{
+  ["q-no","q-rfq","q-validity","q-cname","q-cmobile","q-addr","q-cgstin","q-attn","q-terms"].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value="";
   });
-  document.getElementById("q-date").value=new Date().toISOString().split("T")[0];
+  document.getElementById("q-date").value=todayLocal();
   document.getElementById("q-pf").value="included";
   document.getElementById("q-pf-amt").value="0";
   document.getElementById("q-prows").innerHTML="";
   QRC=0; addQRow(); recalcQ();
   qEditingOriginalNo=null;
   document.getElementById("quot-edit-banner").style.display="none";
+  suggestNo("q-no",allQHist,"quotNo");
 }
 
 function cancelQuotEdit() { clearQForm(true); }
@@ -1598,6 +1755,11 @@ function saveQuot() {
   if(SCRIPT_URL==="YOUR_GOOGLE_APPS_SCRIPT_URL_HERE"){
     showToast("⚠ Paste your Apps Script URL first.","error");return;
   }
+  // Same silent-overwrite protection as invoices
+  const overwriting=allQHist.some(i=>String(i.quotNo)===String(d.quotNo)) &&
+                    String(qEditingOriginalNo||"")!==String(d.quotNo);
+  if(overwriting &&
+     !confirm("⚠ Quotation "+d.quotNo+" already exists.\n\nSaving will OVERWRITE that quotation with this one. Continue?")) return;
   const wasRenamed=qEditingOriginalNo && String(qEditingOriginalNo)!==String(d.quotNo);
   document.getElementById("loading").style.display="flex";
   const doSave=()=>{
@@ -1623,8 +1785,14 @@ function saveQuot() {
     document.getElementById("quot-edit-banner").style.display="none";
   };
   if(wasRenamed){
-    fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteQuotation",quotNo:qEditingOriginalNo})})
-      .then(()=>doSave()).then(afterSave).catch(onFail);
+    // Save the new number FIRST, then remove the old-numbered row.
+    doSave().then(res=>{
+      if(res.status==="ok"){
+        fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteQuotation",quotNo:qEditingOriginalNo})})
+          .catch(()=>showToast("Saved, but old row "+qEditingOriginalNo+" could not be removed — please delete it from History.","error"))
+          .finally(()=>afterSave(res));
+      } else afterSave(res);
+    }).catch(onFail);
   } else {
     doSave().then(afterSave).catch(onFail);
   }
@@ -1636,6 +1804,9 @@ function qCacheAdd(d) {
   const idx=list.findIndex(x=>x.quotNo===d.quotNo);
   if(idx>=0)list[idx]=d; else list.unshift(d);
   sessionStorage.setItem("je_quot",JSON.stringify(list));
+  // Same in-memory sync as invoices
+  allQHist=allQHist.filter(x=>String(x.quotNo)!==String(d.quotNo));
+  allQHist.unshift(d);
 }
 
 // ─── QUOTATION HISTORY ───
@@ -1648,11 +1819,14 @@ function loadQHist() {
   fetch(SCRIPT_URL+"?action=getQuotations")
   .then(r=>r.json())
   .then(res=>{
-    if(res.status==="ok"&&res.rows&&res.rows.length){
+    if(res.status==="ok"&&Array.isArray(res.rows)){
       allQHist=res.rows.map(fromQRow);
+      // newest first (same reason as loadHist)
+      allQHist.sort((a,b)=>(Date.parse(b.timestamp)||0)-(Date.parse(a.timestamp)||0));
       sessionStorage.setItem("je_quot",JSON.stringify(allQHist));
       renderQHist(allQHist);
       buildQProductDirectory(allQHist);
+      if(!qEditingOriginalNo) suggestNo("q-no",allQHist,"quotNo");
     }
   })
   .catch(()=>{});
@@ -1666,18 +1840,18 @@ function renderQHist(list) {
   }
   tb.innerHTML=list.map(q=>`
     <tr>
-      <td><span class="badge">${q.quotNo||"—"}</span></td>
-      <td>${fmtDate(q.date)}</td>
-      <td><strong>${q.cname||"—"}</strong></td>
-      <td>${q.validity||"—"}</td>
+      <td><span class="badge">${esc(q.quotNo)||"—"}</span></td>
+      <td>${esc(fmtDate(q.date))}</td>
+      <td><strong>${esc(q.cname)||"—"}</strong></td>
+      <td>${esc(q.validity)||"—"}</td>
       <td style="font-size:11px">${q.gstType==="cgst_sgst"?"CGST+SGST":q.gstType==="igst"?"IGST":"NIL"}</td>
       <td><strong>₹${parseFloat(q.grand||0).toFixed(2)}</strong></td>
       <td>
-        <button class="vbtn" onclick="viewQuot('${q.quotNo}')">View</button>
-        <button class="ebtn" onclick="editQuot('${q.quotNo}')">Edit</button>
-        <button class="wabtn" onclick="sendQWAFor('${q.quotNo}')">WhatsApp</button>
-        <button class="pbtn" onclick="printQuot('${q.quotNo}')">Print</button>
-        <button class="dbtn" onclick="delQuot('${q.quotNo}')">Delete</button>
+        <button class="vbtn" onclick="viewQuot('${escArg(q.quotNo)}')">View</button>
+        <button class="ebtn" onclick="editQuot('${escArg(q.quotNo)}')">Edit</button>
+        <button class="wabtn" onclick="sendQWAFor('${escArg(q.quotNo)}')">WhatsApp</button>
+        <button class="pbtn" onclick="printQuot('${escArg(q.quotNo)}')">Print</button>
+        <button class="dbtn" onclick="delQuot('${escArg(q.quotNo)}')">Delete</button>
       </td>
     </tr>`).join("");
 }
@@ -1695,6 +1869,7 @@ function findQuot(no){return allQHist.find(i=>String(i.quotNo)===String(no));}
 function viewQuot(no){
   const q=findQuot(no);
   if(!q){showToast("Quotation not found","error");return;}
+  document.getElementById("mtitle").textContent="Quotation Preview";
   document.getElementById("pif").srcdoc=buildQuotHTML(q);
   document.getElementById("modal").classList.add("open");
 }
@@ -1731,10 +1906,21 @@ function editQuot(no){
   switchTab("quot");
   qEditingOriginalNo=String(q.quotNo||"");
   document.getElementById("q-no").value=q.quotNo||"";
-  document.getElementById("q-date").value=q.date||"";
+  // Normalize date — Sheets may return DD/MM/YYYY or an ISO datetime;
+  // input[type=date] needs YYYY-MM-DD
+  const rawQDate=q.date||"";
+  let normQDate=rawQDate;
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(rawQDate)){
+    const [dd,mm,yyyy]=rawQDate.split("/");
+    normQDate=`${yyyy}-${mm}-${dd}`;
+  } else if(/^\d{4}-\d{2}-\d{2}T/.test(rawQDate)){
+    normQDate=rawQDate.slice(0,10);
+  }
+  document.getElementById("q-date").value=normQDate;
   document.getElementById("q-rfq").value=q.rfq||"";
   document.getElementById("q-validity").value=q.validity||"";
   document.getElementById("q-cname").value=q.cname||"";
+  document.getElementById("q-cmobile").value=q.cmobile||"";
   document.getElementById("q-addr").value=q.addr||"";
   document.getElementById("q-cgstin").value=q.cgstin||"";
   document.getElementById("q-attn").value=q.attn||"";
@@ -1752,6 +1938,10 @@ function editQuot(no){
     document.getElementById("qm-"+n).value=p.make||"";
     document.getElementById("qr2-"+n).value=p.rate||"";
     document.getElementById("qq-"+n).value=p.qty||"";
+    // Recalculate the row total — previously the Amount cells stayed blank
+    // after Edit, which made totals show ₹0.00 until qty/rate was retyped.
+    if(p.qty && p.rate) calcQAmt(n);
+    else if(p.amt) document.getElementById("qa-"+n).value=(+p.amt).toFixed(2);
   });
   recalcQ();
   document.getElementById("quot-edit-banner-no").textContent=q.quotNo||"";
@@ -1764,6 +1954,7 @@ function editQuot(no){
 function previewQuot(){
   const d=collectQ();
   if(!validateQ(d)) return;
+  document.getElementById("mtitle").textContent="Quotation Preview";
   document.getElementById("pif").srcdoc=buildQuotHTML(d);
   document.getElementById("modal").classList.add("open");
 }
@@ -1939,13 +2130,12 @@ function sendQWAFor(no){
   openQWhatsApp(q);
 }
 function openQWhatsApp(d){
-  const mobile=document.getElementById("q-cname")?.value?
-    (allQHist.find(q=>q.cname===d.cname)||{}).mobile||"" : "";
-  // Try to get mobile from customer directory
+  // Prefer the mobile saved on this quotation; fall back to the
+  // customer directory built from invoice history.
   const key=(d.cname||"").toLowerCase();
   const custInfo=customerDirectory[key]||{};
-  const phone=cleanPhone(custInfo.mobile||"");
-  if(!phone){showToast("No mobile number found for this customer. Save an invoice for them first.","error");return;}
+  const phone=cleanPhone(d.cmobile||custInfo.mobile||"");
+  if(!phone){showToast("No mobile number found for this customer. Add it in the form, or save an invoice for them first.","error");return;}
   const msg=encodeURIComponent(
     `Hello ${d.cname||""},\n\nPlease find your quotation from ${CO.name}.\n\n`+
     `Quotation No: ${d.quotNo||""}\n`+
@@ -1974,13 +2164,13 @@ function buildQProductDirectory(list) {
   const dl=document.getElementById("q-product-list");
   if(dl){
     dl.innerHTML=Object.values(productDirectory)
-      .map(p=>`<option value="${p.desc.replace(/"/g,"&quot;")}">`).join("");
+      .map(p=>`<option value="${esc(p.desc)}">`).join("");
   }
   // Also refresh invoice product list since same directory
   const dl2=document.getElementById("product-list");
   if(dl2){
     dl2.innerHTML=Object.values(productDirectory)
-      .map(p=>`<option value="${p.desc.replace(/"/g,"&quot;")}">`).join("");
+      .map(p=>`<option value="${esc(p.desc)}">`).join("");
   }
 }
 
@@ -2004,6 +2194,7 @@ function autofillQCustomer() {
     const el=document.getElementById(id);
     if(el && !el.value.trim() && val) el.value=val;
   };
+  setIfEmpty("q-cmobile",match.mobile);
   setIfEmpty("q-cgstin",match.gstin);
   showToast("✓ Autofilled details for "+match.name,"success");
 }
@@ -2013,8 +2204,8 @@ function refreshQCustomerList() {
   const dl=document.getElementById("q-customer-list");
   if(dl){
     dl.innerHTML=Object.values(customerDirectory)
-      .map(c=>`<option value="${c.name.replace(/"/g,"&quot;")}">`).join("");
+      .map(c=>`<option value="${esc(c.name)}">`).join("");
   }
 }
 </script>
-</body></html>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a23b2f49f96e3d24',t:'MTc4NTQ4NjAzNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body></html>
