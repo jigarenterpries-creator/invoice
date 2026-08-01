@@ -254,6 +254,8 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
       <button class="tabBtn" id="tab-history" onclick="switchTab('history')">📋 Invoices</button>
       <button class="tabBtn" id="tab-quot" onclick="switchTab('quot')">📝 New Quotation</button>
       <button class="tabBtn" id="tab-qhist" onclick="switchTab('qhist')">📋 Quotations</button>
+      <button class="tabBtn" id="tab-prof" onclick="switchTab('prof')">🌍 Proforma</button>
+      <button class="tabBtn" id="tab-phist" onclick="switchTab('phist')">🗂 Proformas</button>
       <button class="logoutBtn" onclick="doLogout()">Sign Out</button>
     </div>
   </div>
@@ -522,6 +524,119 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
     </div>
   </div>
 </div>
+
+<!-- PROFORMA INVOICE (INTERNATIONAL / EXPORT) -->
+<div class="panel" id="panel-prof">
+  <div class="fw">
+
+    <div class="card fw2" id="prof-edit-banner" style="display:none;background:#fff8e1;border:1.5px solid #f5c542;flex-direction:row;align-items:center;justify-content:space-between;padding:14px 20px">
+      <span style="font-weight:700;color:#8a6d00">✏️ Editing Proforma <span id="prof-edit-banner-no"></span> — saving will update this record in Google Sheets.</span>
+      <button class="btn btn-o" style="margin-left:14px" onclick="cancelProfEdit()">Cancel Edit</button>
+    </div>
+
+    <div class="card">
+      <div class="ctitle"><span>📄</span> Proforma Details</div>
+      <div class="fr">
+        <div class="field"><label>Proforma Invoice No.*</label><input type="text" id="pf-no" placeholder="e.g. JE/PI/26-27/126"></div>
+        <div class="field"><label>Date of Issue*</label><input type="date" id="pf-date"></div>
+      </div>
+      <div class="fr">
+        <div class="field"><label>Mode of Shipment</label><input type="text" id="pf-mode" list="shipmode-list" placeholder="e.g. SEA FREIGHT (CIF)" autocomplete="off">
+          <datalist id="shipmode-list">
+            <option value="SEA FREIGHT (CIF)">
+            <option value="SEA FREIGHT (FOB)">
+            <option value="AIR FREIGHT (CIF)">
+            <option value="AIR FREIGHT / COURIER (DDP)">
+            <option value="EX-WORKS (EXW)">
+          </datalist>
+        </div>
+        <div class="field"><label>Port of Loading</label><input type="text" id="pf-pol" placeholder="e.g. NHAVA SHEVA PORT, INDIA"></div>
+      </div>
+      <div class="fr s"><div class="field"><label>Port of Discharge</label><input type="text" id="pf-pod" placeholder="e.g. LAGOS APAPA SEA PORT, NIGERIA"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="ctitle"><span>🌍</span> Overseas Buyer / Consignee</div>
+      <div class="fr s"><div class="field"><label>Buyer / Company Name*</label><input type="text" id="pf-bname" placeholder="e.g. Frio Electromechal Innovations"></div></div>
+      <div class="fr s"><div class="field"><label>Full Address</label><textarea id="pf-baddr" placeholder="Street, City, State, Country..." style="min-height:52px"></textarea></div></div>
+      <div class="fr">
+        <div class="field"><label>Phone (with country code)</label><input type="text" id="pf-bphone" placeholder="e.g. +234 8039419607"></div>
+        <div class="field"><label>Email</label><input type="text" id="pf-bemail" placeholder="buyer@example.com"></div>
+      </div>
+      <div class="fr s"><div class="field"><label>Tax ID / VAT No. (optional)</label><input type="text" id="pf-btax" placeholder="Buyer tax / VAT number if any"></div></div>
+    </div>
+
+    <div class="card fw2">
+      <div class="ctitle"><span>📦</span> Export Items (USD)</div>
+      <div class="ph" style="grid-template-columns:28px 1fr 2.2fr 100px 70px 110px 32px">
+        <span>#</span><span>Export HSN</span><span>Description of Equipment</span>
+        <span class="r">Unit Price ($)</span><span class="r">Qty</span><span class="r">Total FOB ($)</span><span></span>
+      </div>
+      <div class="prows" id="pf-prows" style="border:1.5px solid var(--border);border-top:none;border-radius:0 0 7px 7px;overflow:hidden"></div>
+      <button class="addbtn" onclick="addPRow()">+ Add Another Item</button>
+      <datalist id="pf-product-list"></datalist>
+    </div>
+
+    <div class="card fw2">
+      <div class="ctitle"><span>💰</span> Freight, Insurance & International Terms (USD)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px">
+        <div>
+          <div class="fr">
+            <div class="field"><label>Consolidated Freight ($)</label><input type="number" id="pf-freight" value="0" min="0" oninput="recalcP()"></div>
+            <div class="field"><label>Marine Insurance ($)</label><input type="number" id="pf-ins" value="0" min="0" oninput="recalcP()"></div>
+          </div>
+          <div class="fr s"><div class="field"><label>Payment Mandate Clause</label><textarea id="pf-pay" style="min-height:52px"></textarea></div></div>
+          <div class="fr s"><div class="field"><label>Incoterms Delivery Clause</label><textarea id="pf-inco" style="min-height:52px"></textarea></div></div>
+          <div class="fr s"><div class="field"><label>Commercial Guarantee Clause</label><textarea id="pf-guar" style="min-height:52px"></textarea></div></div>
+        </div>
+        <div class="tgrid">
+          <div class="trow"><span class="tlabel">Total Product Value (FOB)</span><span class="tval" id="pft-fob">$0.00</span></div>
+          <div class="trow"><span class="tlabel">Consolidated Freight</span><span class="tval" id="pft-freight">$0.00</span></div>
+          <div class="trow"><span class="tlabel">Marine Insurance</span><span class="tval" id="pft-ins">$0.00</span></div>
+          <div class="trow grand"><span class="tlabel">Total CIF Payable (USD)</span><span class="tval" id="pft-cif">$0.00</span></div>
+          <div class="trow" style="margin-top:6px;background:#eef0f6;border-radius:6px">
+            <span class="tlabel" style="font-size:11px">Amount in Words</span>
+          </div>
+          <div style="padding:7px 11px;background:#eef0f6;border-radius:6px;font-size:12px;color:var(--muted)" id="pft-words">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="abar">
+      <button class="btn btn-o" onclick="clearPForm()">🗑 Clear Form</button>
+      <button class="btn btn-wa" onclick="sendPWhatsApp()">📲 Send on WhatsApp</button>
+      <button class="btn btn-s" onclick="previewProf()">👁 Preview</button>
+      <button class="btn btn-p" onclick="saveProf()">💾 Save to Google Sheets</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- PROFORMA HISTORY -->
+<div class="panel" id="panel-phist">
+  <div class="hwrap">
+    <div class="htbar">
+      <div class="htitle">Proforma History</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="vbtn" style="padding:8px 14px;font-size:13px" title="Download the listed proformas as an Excel file" onclick="exportProfExcel()">⬇ Export Excel</button>
+        <input class="hsearch" id="phsearch" placeholder="Search proforma no or buyer..." oninput="filterPHist()">
+      </div>
+    </div>
+    <div class="htw">
+      <table class="htable">
+        <thead>
+          <tr>
+            <th>PI No</th><th>Date</th><th>Buyer</th>
+            <th>Mode</th><th>Port of Discharge</th><th>Total CIF ($)</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="phbody">
+          <tr><td colspan="7"><div class="empty"><div class="ei">📂</div><p>No proformas yet.</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 </div>
 
 <div class="loverlay" id="loading">
@@ -550,6 +665,9 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);fo
 // CONFIG — paste your deployed Apps Script URL here
 // ═══════════════════════════════════════════════════
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzgn8AdDZEW2ED9FzDrg6b53wW4n1uZvfMOjtVSyIeYrSiN9NX7YixCzuuadUQ7A7o/exec";
+// Shared secret — must match API_TOKEN in code.gs (Apps Script). Requests
+// without it are rejected, so the sheet can't be written by random strangers.
+const API_TOKEN = "je-inv-Q7mX4pL9wR2tZ8kD-2026";
 
 // ═══════════════════════════════════════════════════
 // COMPANY (static, never changes)
@@ -682,7 +800,7 @@ function doLogin() {
      document.getElementById("lp").value===CREDS.p) {
     document.getElementById("ls").style.display="none";
     document.getElementById("app").style.display="block";
-    initForm(); loadHist(); initQForm(); loadQHist();
+    initForm(); loadHist(); initQForm(); loadQHist(); initProfForm(); loadPHist();
   } else {
     const e=document.getElementById("lerr");
     e.style.display="block";
@@ -704,7 +822,7 @@ document.addEventListener("keydown",e=>{
 // TABS
 // ═══════════════════════════════════════════════════
 function switchTab(t) {
-  ["new","history","quot","qhist"].forEach(x=>{
+  ["new","history","quot","qhist","prof","phist"].forEach(x=>{
     document.getElementById("panel-"+x).classList.remove("active");
     document.getElementById("tab-"+x).classList.remove("active");
   });
@@ -713,6 +831,8 @@ function switchTab(t) {
   window.scrollTo(0,0);
   if(t==="history") loadHist();
   if(t==="qhist") loadQHist();
+  if(t==="phist") loadPHist();
+  if(t==="prof") refreshPFProductList();
 }
 
 // ═══════════════════════════════════════════════════
@@ -875,7 +995,7 @@ function saveInv() {
   document.getElementById("loading").style.display="flex";
 
   const doSave=()=>{
-    const payload={action:"saveInvoice",row:toRow(d)};
+    const payload={action:"saveInvoice",token:API_TOKEN,row:toRow(d)};
     return fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify(payload)}).then(r=>r.json());
   };
 
@@ -908,7 +1028,7 @@ function saveInv() {
     // untouched), then remove the old-numbered row.
     doSave().then(res=>{
       if(res.status==="ok") {
-        fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteInvoice",invoiceNo:editingOriginalNo})})
+        fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteInvoice",token:API_TOKEN,invoiceNo:editingOriginalNo})})
           .catch(()=>showToast("Saved, but old row "+editingOriginalNo+" could not be removed — please delete it from History.","error"))
           .finally(()=>afterSave(res));
       } else afterSave(res);
@@ -945,7 +1065,7 @@ function loadHist() {
   allHist=cached; renderHist(cached); buildCustomerDirectory(cached); buildProductDirectory(cached);
   // Then fetch from sheet
   if(SCRIPT_URL==="YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") return;
-  fetch(SCRIPT_URL+"?action=getInvoices")
+  fetch(SCRIPT_URL+"?action=getInvoices&token="+encodeURIComponent(API_TOKEN))
   .then(r=>r.json())
   .then(res=>{
     // Trust the server whenever it answers — even with ZERO rows — so
@@ -1163,7 +1283,7 @@ function printInv(no) {
 function delInv(no) {
   if(!confirm("Delete Invoice "+no+" permanently?")) return;
   document.getElementById("loading").style.display="flex";
-  fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteInvoice",invoiceNo:no})})
+  fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteInvoice",token:API_TOKEN,invoiceNo:no})})
   .then(r=>r.json())
   .then(res=>{
     document.getElementById("loading").style.display="none";
@@ -1763,7 +1883,7 @@ function saveQuot() {
   const wasRenamed=qEditingOriginalNo && String(qEditingOriginalNo)!==String(d.quotNo);
   document.getElementById("loading").style.display="flex";
   const doSave=()=>{
-    return fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"saveQuotation",row:toQRow(d)})}).then(r=>r.json());
+    return fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"saveQuotation",token:API_TOKEN,row:toQRow(d)})}).then(r=>r.json());
   };
   const afterSave=(res)=>{
     document.getElementById("loading").style.display="none";
@@ -1788,7 +1908,7 @@ function saveQuot() {
     // Save the new number FIRST, then remove the old-numbered row.
     doSave().then(res=>{
       if(res.status==="ok"){
-        fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteQuotation",quotNo:qEditingOriginalNo})})
+        fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteQuotation",token:API_TOKEN,quotNo:qEditingOriginalNo})})
           .catch(()=>showToast("Saved, but old row "+qEditingOriginalNo+" could not be removed — please delete it from History.","error"))
           .finally(()=>afterSave(res));
       } else afterSave(res);
@@ -1816,7 +1936,7 @@ function loadQHist() {
   const cached=JSON.parse(sessionStorage.getItem("je_quot")||"[]");
   allQHist=cached; renderQHist(cached);
   if(SCRIPT_URL==="YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") return;
-  fetch(SCRIPT_URL+"?action=getQuotations")
+  fetch(SCRIPT_URL+"?action=getQuotations&token="+encodeURIComponent(API_TOKEN))
   .then(r=>r.json())
   .then(res=>{
     if(res.status==="ok"&&Array.isArray(res.rows)){
@@ -1883,7 +2003,7 @@ function printQuot(no){
 function delQuot(no){
   if(!confirm("Delete Quotation "+no+" permanently?")) return;
   document.getElementById("loading").style.display="flex";
-  fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteQuotation",quotNo:no})})
+  fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteQuotation",token:API_TOKEN,quotNo:no})})
   .then(r=>r.json())
   .then(res=>{
     document.getElementById("loading").style.display="none";
@@ -2207,5 +2327,680 @@ function refreshQCustomerList() {
       .map(c=>`<option value="${esc(c.name)}">`).join("");
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// PROFORMA INVOICES (INTERNATIONAL / EXPORT)
+// ═══════════════════════════════════════════════════════════════
+// Export-only identity + bank wire registry (shown on proforma documents)
+const COX = {
+  iec:"AKGPP9254R",
+  phone:"+91 9408500184",
+  email:"jigarenterpries@gmail.com",
+  tagline:"Supplying engineered pumping systems globally to entities like ONGC, ISRO, and Ratnamani.",
+  bankName:"AXIS BANK LTD",
+  bankBranch:"RELIEF ROAD, AHMEDABAD, INDIA",
+  bankAcctName:"JIGAR ENTERPRISE",
+  bankAcct:"9160 2002 5610 574",
+  bankSwift:"AXISINBB453",
+  bankIfsc:"UTIB0000453",
+  bankDealer:"6360483-5700009",
+  bankAd:"6360424"
+};
+// Default clause texts (editable in the form every time)
+const PROF_TERMS = {
+  pay:"100% payment needs to be done in advance via banking telegraphic wire transfer routing prior to packaging release or factory dispatch.",
+  inco:"Priced parameters reflect strict CIF metrics to the specified destination port. Local customs destination clearing, terminal handling fees, and local country taxes/duties remain under the buyer's scope.",
+  guar:"Equipment carries a firm 12-month manufacturer performance warranty against engineering or manufacturing defects."
+};
+
+// ── Column contract with the "Proformas" sheet (matches PROF_HEADERS in code.gs) ──
+const PCOLS = [
+  "Timestamp",        // 0
+  "Proforma No",      // 1
+  "Date",             // 2
+  "Buyer Name",       // 3
+  "Buyer Address",    // 4
+  "Buyer Phone",      // 5
+  "Buyer Email",      // 6
+  "Buyer Tax ID",     // 7
+  "Shipment Mode",    // 8
+  "Port of Loading",  // 9
+  "Port of Discharge",// 10
+  "Products",         // 11
+  "FOB Total",        // 12
+  "Freight",          // 13
+  "Insurance",        // 14
+  "CIF Total",        // 15
+  "Amount in Words",  // 16
+  "Payment Clause",   // 17
+  "Incoterms Clause", // 18
+  "Guarantee Clause"  // 19
+];
+function toPRow(d){
+  return [
+    d.timestamp, d.profNo, d.date,
+    d.bname, d.baddr, d.bphone, d.bemail, d.btax,
+    d.mode, d.pol, d.pod,
+    d.productsStr,
+    d.fob, d.freight, d.ins, d.cif,
+    d.amtWords, d.pay, d.inco, d.guar
+  ];
+}
+function fromPRow(r){
+  return {
+    timestamp:   r[0]||"",
+    profNo:      r[1]||"",
+    date:        r[2]||"",
+    bname:       r[3]||"",
+    baddr:       r[4]||"",
+    bphone:      r[5]||"",
+    bemail:      r[6]||"",
+    btax:        r[7]||"",
+    mode:        r[8]||"",
+    pol:         r[9]||"",
+    pod:         r[10]||"",
+    productsStr: r[11]||"",
+    fob:         parseFloat(r[12])||0,
+    freight:     parseFloat(r[13])||0,
+    ins:         parseFloat(r[14])||0,
+    cif:         parseFloat(r[15])||0,
+    amtWords:    r[16]||"",
+    pay:         r[17]||"",
+    inco:        r[18]||"",
+    guar:        r[19]||"",
+    products:    parsePProducts(r[11]||"")
+  };
+}
+function parsePProducts(str){
+  if(!str) return [];
+  return str.split(" ;; ").map((p,i)=>{
+    const segs=p.split(" | ");
+    const desc=(segs[0]||"").trim();
+    const parts={};
+    segs.slice(1).forEach(s=>{
+      const [k,...v]=s.split(":");
+      if(k&&v.length) parts[k.trim()]=v.join(":").trim();
+    });
+    return {
+      sr:i+1,
+      desc:desc||p,
+      hsn:parts["HSN"]||"",
+      note:parts["Details"]||"",
+      qty:parts["Qty"]||"",
+      rate:parts["Rate"]||"",
+      amt:parseFloat(parts["Amt"])||0
+    };
+  });
+}
+
+// ── USD / export formatting helpers ──
+const MONTHS3=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function fmtDateExport(s){
+  if(!s) return "";
+  const iso=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(iso) return `${iso[3]}-${MONTHS3[parseInt(iso[2],10)-1]}-${iso[1]}`;
+  const dmy=String(s).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(dmy) return `${dmy[1]}-${MONTHS3[parseInt(dmy[2],10)-1]}-${dmy[3]}`;
+  return String(s);
+}
+function usd(n){ return "$"+(+n||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function nwThree(n){
+  let s=""; const h=Math.floor(n/100), r=n%100;
+  if(h) s+=NW_ONES[h]+" Hundred"+(r?" ":"");
+  if(r<20) s+=NW_ONES[r]; else s+=NW_TENS[Math.floor(r/10)]+(r%10?"-"+NW_ONES[r%10]:"");
+  return s;
+}
+function numberToWordsWestern(num){
+  num=Math.floor(Math.abs(num));
+  if(num===0) return "Zero";
+  const units=["","Thousand","Million","Billion"];
+  let i=0; const parts=[];
+  while(num>0 && i<units.length){
+    const g=num%1000;
+    if(g) parts.unshift(nwThree(g)+(units[i]?" "+units[i]:""));
+    num=Math.floor(num/1000); i++;
+  }
+  return parts.join(" ");
+}
+function usdToWords(amount){
+  amount=Math.abs(+amount||0);
+  const n=Math.floor(amount), c=Math.round((amount-n)*100);
+  let words=numberToWordsWestern(n)+" US Dollars";
+  if(c>0) words+=" and "+numberToWordsWestern(c)+" Cents";
+  return (words+" Only").toUpperCase();
+}
+
+// ── Form machinery (same pattern as invoice/quotation) ──
+let PRC=0;
+let pEditingOriginalNo=null;
+let allPHist=[];
+
+function profDefaults(){
+  document.getElementById("pf-pol").value="NHAVA SHEVA PORT, INDIA";
+  document.getElementById("pf-mode").value="SEA FREIGHT (CIF)";
+  document.getElementById("pf-pay").value=PROF_TERMS.pay;
+  document.getElementById("pf-inco").value=PROF_TERMS.inco;
+  document.getElementById("pf-guar").value=PROF_TERMS.guar;
+}
+function initProfForm(){
+  document.getElementById("pf-date").value=todayLocal();
+  profDefaults();
+  document.getElementById("pf-prows").innerHTML="";
+  PRC=0; addPRow(); recalcP();
+}
+function addPRow(){
+  PRC++;const n=PRC;
+  const d=document.createElement("div");
+  d.className="prow";
+  d.style.gridTemplateColumns="28px 1fr 2.2fr 100px 70px 110px 32px";
+  d.id="pfpr-"+n;
+  d.innerHTML=`
+    <div class="rnum">${n}</div>
+    <input type="text" placeholder="HSN" id="pfh-${n}">
+    <input type="text" placeholder="Description..." id="pfd-${n}" list="pf-product-list" autocomplete="off" oninput="autofillPProduct(${n})">
+    <input type="number" class="r" placeholder="0.00" id="pfr2-${n}" min="0" oninput="calcPAmt(${n})">
+    <input type="number" class="r" placeholder="0" id="pfq-${n}" min="0" oninput="calcPAmt(${n})">
+    <input class="r" id="pfa-${n}" readonly placeholder="0.00">
+    <button class="rmbtn" onclick="remPRow(${n})" title="Remove">−</button>
+    <input type="text" id="pfn-${n}" placeholder="Optional spec / packaging note shown under the description..." style="grid-column:3/4;font-size:11px">`;
+  document.getElementById("pf-prows").appendChild(d);
+}
+function remPRow(n){
+  if(document.querySelectorAll("#pf-prows .prow").length<=1){showToast("Need at least one item.","error");return;}
+  document.getElementById("pfpr-"+n)?.remove(); recalcP();
+}
+function calcPAmt(n){
+  const q=parseFloat(document.getElementById("pfq-"+n)?.value)||0;
+  const r=parseFloat(document.getElementById("pfr2-"+n)?.value)||0;
+  const a=q*r;
+  const el=document.getElementById("pfa-"+n);
+  if(el) el.value=a>0?a.toFixed(2):"";
+  recalcP();
+}
+function getPRows(){
+  return Array.from(document.querySelectorAll("#pf-prows .prow")).map(row=>{
+    const id=row.id.replace("pfpr-","");
+    return {
+      hsn:  document.getElementById("pfh-"+id)?.value||"",
+      desc: document.getElementById("pfd-"+id)?.value||"",
+      note: document.getElementById("pfn-"+id)?.value||"",
+      rate: document.getElementById("pfr2-"+id)?.value||"",
+      qty:  document.getElementById("pfq-"+id)?.value||"",
+      amt:  parseFloat(document.getElementById("pfa-"+id)?.value)||0
+    };
+  }).filter(r=>r.desc||r.qty||r.rate);
+}
+function refreshPFProductList(){
+  const dl=document.getElementById("pf-product-list");
+  if(dl){
+    dl.innerHTML=Object.values(productDirectory)
+      .map(p=>`<option value="${esc(p.desc)}">`).join("");
+  }
+}
+function autofillPProduct(n){
+  const typed=(document.getElementById("pfd-"+n)?.value||"").trim().toLowerCase();
+  const match=productDirectory[typed];
+  if(!match) return;
+  const hsnEl=document.getElementById("pfh-"+n);
+  if(hsnEl && !hsnEl.value.trim() && match.hsn){
+    hsnEl.value=match.hsn;
+    showToast("✓ Autofilled HSN for "+match.desc,"success");
+  }
+}
+
+function recalcP(){
+  const rows=getPRows();
+  const fob=rows.reduce((s,r)=>s+r.amt,0);
+  const freight=parseFloat(document.getElementById("pf-freight")?.value)||0;
+  const ins=parseFloat(document.getElementById("pf-ins")?.value)||0;
+  const cif=fob+freight+ins;
+  document.getElementById("pft-fob").textContent=usd(fob);
+  document.getElementById("pft-freight").textContent=usd(freight);
+  document.getElementById("pft-ins").textContent=usd(ins);
+  document.getElementById("pft-cif").textContent=usd(cif);
+  document.getElementById("pft-words").textContent=usdToWords(cif);
+  return{fob,freight,ins,cif,amtWords:usdToWords(cif)};
+}
+
+function collectP(){
+  const t=recalcP();
+  const rows=getPRows();
+  const productsStr=rows.map(p=>
+    `${p.desc} | HSN:${p.hsn} | Details:${p.note} | Qty:${p.qty} | Rate:${p.rate} | Amt:${p.amt.toFixed(2)}`
+  ).join(" ;; ");
+  return {
+    timestamp: new Date().toISOString(),
+    profNo:   document.getElementById("pf-no").value.trim(),
+    date:     document.getElementById("pf-date").value,
+    bname:    document.getElementById("pf-bname").value.trim(),
+    baddr:    document.getElementById("pf-baddr").value.trim(),
+    bphone:   document.getElementById("pf-bphone").value.trim(),
+    bemail:   document.getElementById("pf-bemail").value.trim(),
+    btax:     document.getElementById("pf-btax").value.trim(),
+    mode:     document.getElementById("pf-mode").value.trim(),
+    pol:      document.getElementById("pf-pol").value.trim(),
+    pod:      document.getElementById("pf-pod").value.trim(),
+    productsStr,
+    products: rows,
+    pay:      document.getElementById("pf-pay").value.trim(),
+    inco:     document.getElementById("pf-inco").value.trim(),
+    guar:     document.getElementById("pf-guar").value.trim(),
+    ...t
+  };
+}
+function validateP(d){
+  if(!d.profNo){showToast("Please enter Proforma Invoice Number.","error");return false;}
+  if(!d.date){showToast("Please enter Date of Issue.","error");return false;}
+  if(!d.bname){showToast("Please enter Buyer Name.","error");return false;}
+  if(!d.products.length){showToast("Add at least one item.","error");return false;}
+  return true;
+}
+
+function clearPForm(skipConfirm){
+  if(!skipConfirm && !confirm("Clear all proforma fields?")) return;
+  ["pf-no","pf-bname","pf-baddr","pf-bphone","pf-bemail","pf-btax","pf-pod"].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value="";
+  });
+  document.getElementById("pf-freight").value="0";
+  document.getElementById("pf-ins").value="0";
+  document.getElementById("pf-date").value=todayLocal();
+  profDefaults();
+  document.getElementById("pf-prows").innerHTML="";
+  PRC=0; addPRow(); recalcP();
+  pEditingOriginalNo=null;
+  document.getElementById("prof-edit-banner").style.display="none";
+  suggestNo("pf-no",allPHist,"profNo");
+}
+function cancelProfEdit(){ clearPForm(true); }
+
+function saveProf(){
+  const d=collectP();
+  if(!validateP(d)) return;
+  if(SCRIPT_URL==="YOUR_GOOGLE_APPS_SCRIPT_URL_HERE"){
+    showToast("⚠ Paste your Apps Script URL first.","error");return;
+  }
+  const overwriting=allPHist.some(i=>String(i.profNo)===String(d.profNo)) &&
+                    String(pEditingOriginalNo||"")!==String(d.profNo);
+  if(overwriting &&
+     !confirm("⚠ Proforma "+d.profNo+" already exists.\n\nSaving will OVERWRITE that proforma with this one. Continue?")) return;
+  const wasRenamed=pEditingOriginalNo && String(pEditingOriginalNo)!==String(d.profNo);
+  document.getElementById("loading").style.display="flex";
+  const doSave=()=>{
+    return fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"saveProforma",token:API_TOKEN,row:toPRow(d)})}).then(r=>r.json());
+  };
+  const afterSave=(res)=>{
+    document.getElementById("loading").style.display="none";
+    if(res.status==="ok"){
+      showToast(pEditingOriginalNo?"✅ Proforma updated!":"✅ Proforma saved!","success");
+      pCacheAdd(d);
+      if(wasRenamed){
+        allPHist=allPHist.filter(i=>String(i.profNo)!==String(pEditingOriginalNo));
+        sessionStorage.setItem("je_prof",JSON.stringify(allPHist));
+      }
+      pEditingOriginalNo=null;
+      document.getElementById("prof-edit-banner").style.display="none";
+    } else showToast("Error: "+(res.message||"Unknown"),"error");
+  };
+  const onFail=()=>{
+    document.getElementById("loading").style.display="none";
+    showToast("Network error. Saved locally only.","error");
+    pCacheAdd(d); pEditingOriginalNo=null;
+    document.getElementById("prof-edit-banner").style.display="none";
+  };
+  if(wasRenamed){
+    // Save first, delete the old-numbered row only after a successful save.
+    doSave().then(res=>{
+      if(res.status==="ok"){
+        fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteProforma",token:API_TOKEN,profNo:pEditingOriginalNo})})
+          .catch(()=>showToast("Saved, but old row "+pEditingOriginalNo+" could not be removed — please delete it from History.","error"))
+          .finally(()=>afterSave(res));
+      } else afterSave(res);
+    }).catch(onFail);
+  } else {
+    doSave().then(afterSave).catch(onFail);
+  }
+}
+function pCacheAdd(d){
+  let list=JSON.parse(sessionStorage.getItem("je_prof")||"[]");
+  const idx=list.findIndex(x=>x.profNo===d.profNo);
+  if(idx>=0)list[idx]=d; else list.unshift(d);
+  sessionStorage.setItem("je_prof",JSON.stringify(list));
+  // Same in-memory sync as invoices/quotations
+  allPHist=allPHist.filter(x=>String(x.profNo)!==String(d.profNo));
+  allPHist.unshift(d);
+}
+
+// ── Proforma history ──
+function loadPHist(){
+  const cached=JSON.parse(sessionStorage.getItem("je_prof")||"[]");
+  allPHist=cached; renderPHist(cached);
+  if(SCRIPT_URL==="YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") return;
+  fetch(SCRIPT_URL+"?action=getProformas&token="+encodeURIComponent(API_TOKEN))
+  .then(r=>r.json())
+  .then(res=>{
+    if(res.status==="ok"&&Array.isArray(res.rows)){
+      allPHist=res.rows.map(fromPRow);
+      // newest first (same reason as loadHist)
+      allPHist.sort((a,b)=>(Date.parse(b.timestamp)||0)-(Date.parse(a.timestamp)||0));
+      sessionStorage.setItem("je_prof",JSON.stringify(allPHist));
+      renderPHist(allPHist);
+      if(!pEditingOriginalNo) suggestNo("pf-no",allPHist,"profNo");
+    }
+  })
+  .catch(()=>{});
+}
+function renderPHist(list){
+  const tb=document.getElementById("phbody");
+  if(!list.length){
+    tb.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="ei">📂</div><p>No proformas yet.</p></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML=list.map(p=>`
+    <tr>
+      <td><span class="badge">${esc(p.profNo)||"—"}</span></td>
+      <td>${esc(fmtDate(p.date))}</td>
+      <td><strong>${esc(p.bname)||"—"}</strong></td>
+      <td style="font-size:11px">${esc(p.mode)||"—"}</td>
+      <td style="font-size:11px">${esc(p.pod)||"—"}</td>
+      <td><strong>${usd(parseFloat(p.cif||0))}</strong></td>
+      <td>
+        <button class="vbtn" onclick="viewProf('${escArg(p.profNo)}')">View</button>
+        <button class="ebtn" onclick="editProf('${escArg(p.profNo)}')">Edit</button>
+        <button class="wabtn" onclick="sendPWAFor('${escArg(p.profNo)}')">WhatsApp</button>
+        <button class="pbtn" onclick="printProf('${escArg(p.profNo)}')">Print</button>
+        <button class="dbtn" onclick="delProf('${escArg(p.profNo)}')">Delete</button>
+      </td>
+    </tr>`).join("");
+}
+function filterPHist(){
+  const q=document.getElementById("phsearch").value.toLowerCase();
+  renderPHist(allPHist.filter(i=>
+    (i.profNo||"").toLowerCase().includes(q)||
+    (i.bname||"").toLowerCase().includes(q)||
+    (i.pod||"").toLowerCase().includes(q)
+  ));
+}
+function findProf(no){return allPHist.find(i=>String(i.profNo)===String(no));}
+function viewProf(no){
+  const p=findProf(no);
+  if(!p){showToast("Proforma not found","error");return;}
+  document.getElementById("mtitle").textContent="Proforma Preview";
+  document.getElementById("pif").srcdoc=buildProfHTML(p);
+  document.getElementById("modal").classList.add("open");
+}
+function printProf(no){
+  viewProf(no);
+  const iframe=document.getElementById("pif");
+  iframe.onload=()=>{iframe.contentWindow.print();iframe.onload=null;};
+}
+function delProf(no){
+  if(!confirm("Delete Proforma "+no+" permanently?")) return;
+  document.getElementById("loading").style.display="flex";
+  fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteProforma",token:API_TOKEN,profNo:no})})
+  .then(r=>r.json())
+  .then(res=>{
+    document.getElementById("loading").style.display="none";
+    if(res.status==="ok"){
+      allPHist=allPHist.filter(i=>String(i.profNo)!==String(no));
+      sessionStorage.setItem("je_prof",JSON.stringify(allPHist));
+      renderPHist(allPHist);
+      showToast("Proforma deleted.","success");
+    } else showToast(res.message||"Delete failed","error");
+  })
+  .catch(()=>{
+    document.getElementById("loading").style.display="none";
+    showToast("Delete failed","error");
+  });
+}
+
+// ── Edit proforma ──
+function editProf(no){
+  const p=findProf(no);
+  if(!p){showToast("Not found","error");return;}
+  switchTab("prof");
+  pEditingOriginalNo=String(p.profNo||"");
+  document.getElementById("pf-no").value=p.profNo||"";
+  // Normalize date like the other editors
+  const rawPDate=p.date||"";
+  let normPDate=rawPDate;
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(rawPDate)){
+    const [dd,mm,yyyy]=rawPDate.split("/");
+    normPDate=`${yyyy}-${mm}-${dd}`;
+  } else if(/^\d{4}-\d{2}-\d{2}T/.test(rawPDate)){
+    normPDate=rawPDate.slice(0,10);
+  }
+  document.getElementById("pf-date").value=normPDate;
+  document.getElementById("pf-bname").value=p.bname||"";
+  document.getElementById("pf-baddr").value=p.baddr||"";
+  document.getElementById("pf-bphone").value=p.bphone||"";
+  document.getElementById("pf-bemail").value=p.bemail||"";
+  document.getElementById("pf-btax").value=p.btax||"";
+  document.getElementById("pf-mode").value=p.mode||"SEA FREIGHT (CIF)";
+  document.getElementById("pf-pol").value=p.pol||"";
+  document.getElementById("pf-pod").value=p.pod||"";
+  document.getElementById("pf-freight").value=p.freight||0;
+  document.getElementById("pf-ins").value=p.ins||0;
+  document.getElementById("pf-pay").value=p.pay||PROF_TERMS.pay;
+  document.getElementById("pf-inco").value=p.inco||PROF_TERMS.inco;
+  document.getElementById("pf-guar").value=p.guar||PROF_TERMS.guar;
+  document.getElementById("pf-prows").innerHTML="";
+  PRC=0;
+  const prods=(p.products&&p.products.length)?p.products:[{}];
+  prods.forEach(pr=>{
+    addPRow();const n=PRC;
+    document.getElementById("pfh-"+n).value=pr.hsn||"";
+    document.getElementById("pfd-"+n).value=pr.desc||"";
+    document.getElementById("pfn-"+n).value=pr.note||"";
+    document.getElementById("pfr2-"+n).value=pr.rate||"";
+    document.getElementById("pfq-"+n).value=pr.qty||"";
+    // Recalculate each row total (same fix as editQuot)
+    if(pr.qty && pr.rate) calcPAmt(n);
+    else if(pr.amt) document.getElementById("pfa-"+n).value=(+pr.amt).toFixed(2);
+  });
+  recalcP();
+  document.getElementById("prof-edit-banner-no").textContent=p.profNo||"";
+  document.getElementById("prof-edit-banner").style.display="flex";
+  showToast("Loaded Proforma "+(p.profNo||"")+" for editing.","success");
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+// ── Preview / WhatsApp / Excel ──
+function previewProf(){
+  const d=collectP();
+  if(!validateP(d)) return;
+  document.getElementById("mtitle").textContent="Proforma Preview";
+  document.getElementById("pif").srcdoc=buildProfHTML(d);
+  document.getElementById("modal").classList.add("open");
+}
+function sendPWhatsApp(){
+  const d=collectP();
+  if(!validateP(d)) return;
+  openPWhatsApp(d);
+}
+function sendPWAFor(no){
+  const p=findProf(no);
+  if(!p){showToast("Not found","error");return;}
+  openPWhatsApp(p);
+}
+function openPWhatsApp(d){
+  const phone=cleanPhone(d.bphone);
+  if(!phone){showToast("No phone number for this buyer. Add it (with country code) in the form.","error");return;}
+  const msg=encodeURIComponent(
+    `Hello ${d.bname||""},\n\nPlease find your Proforma Invoice from ${CO.name}.\n\n`+
+    `PI No: ${d.profNo||""}\n`+
+    `Date: ${fmtDateExport(d.date)}\n`+
+    (d.pod?`Port of Discharge: ${d.pod}\n`:"")+
+    `Total CIF Payable: ${usd(d.cif)} (USD)\n\n`+
+    `Bank wire details are on the document — we'll share the PDF right after this message.\n\n`+
+    `Thank you!\n${CO.name}\n${COX.phone}`
+  );
+  window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
+}
+function exportProfExcel(){
+  const q=(document.getElementById("phsearch").value||"").toLowerCase();
+  const list=allPHist.filter(i=>
+    (i.profNo||"").toLowerCase().includes(q)||
+    (i.bname||"").toLowerCase().includes(q)||
+    (i.pod||"").toLowerCase().includes(q));
+  exportToXlsx(list.map(d=>({
+    "Proforma No":d.profNo,"Date":fmtDateExport(d.date),"Buyer":d.bname,
+    "Phone":d.bphone,"Email":d.bemail,"Tax ID / VAT":d.btax,
+    "Shipment Mode":d.mode,"Port of Loading":d.pol,"Port of Discharge":d.pod,
+    "FOB ($)":(+d.fob||0).toFixed(2),"Freight ($)":(+d.freight||0).toFixed(2),
+    "Insurance ($)":(+d.ins||0).toFixed(2),"CIF Total ($)":(+d.cif||0).toFixed(2),
+    "Amount in Words":d.amtWords
+  })),"Proformas","jigar-proformas-"+todayLocal()+".xlsx");
+}
+
+// ── Print layout (mirrors the exported proforma document design) ──
+function buildProfHTML(d){
+  const prods=(d.products||[]).map((it,i)=>`
+    <tr>
+      <td class="c-item">${i+1}</td>
+      <td class="c-hsn">${it.hsn||""}</td>
+      <td class="c-desc">
+        <div class="p-title">${it.desc||""}</div>
+        ${it.note?`<div class="p-note">${it.note}</div>`:""}
+      </td>
+      <td class="c-rate">${usd(parseFloat(it.rate||0))}</td>
+      <td class="c-qty">${it.qty||""}<div class="qty-sub">NOS</div></td>
+      <td class="c-amt">${usd(it.amt)}</td>
+    </tr>`).join("");
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Proforma Invoice ${d.profNo}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#1c1c1c;background:#fff;font-size:10.2px;line-height:1.32;padding:14px 30px}
+    .hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px}
+    .badge{display:inline-block;background:#1899d3;color:#fff;font-weight:700;letter-spacing:1.3px;
+      font-size:11.5px;padding:6px 14px;border-radius:4px;margin-top:2px;white-space:nowrap}
+    .co{text-align:right}
+    .co-name{font-size:18px;font-weight:800;letter-spacing:.5px;color:#111;text-transform:uppercase;line-height:1.15}
+    .co-sub{font-size:11px;font-weight:600;color:#333;margin:0 0 2px}
+    .co p{font-size:10px;margin:.5px 0;color:#333}
+    .co .iec{font-weight:700;color:#000;margin-top:2px}
+    .tag{font-style:italic;color:#6a7383;font-size:9.6px;margin-top:2px;max-width:520px;margin-left:auto}
+    .divider{border-top:2px solid #1c1c1c;margin:4px 0 7px}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:7px}
+    .box{background:#f3f6fa;border:1px solid #e3e9f2;border-radius:8px;padding:6px 11px}
+    .bh{color:#1899d3;font-size:9.4px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+      border-bottom:1px solid #dbe3ee;padding-bottom:4px;margin-bottom:5px}
+    .buyer-name{font-size:12.3px;font-weight:800;color:#111;margin-bottom:2px}
+    .buyer-line{font-size:10.6px;color:#222;margin:1px 0}
+    .buyer-email{font-size:10.2px;color:#1899d3;font-weight:600;margin:1px 0}
+    .buyer-tax{font-size:9.7px;color:#6a7383;margin-top:4px}
+    .mr{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:3px 0;font-size:10.4px}
+    .ml{color:#444;font-weight:600;white-space:nowrap}
+    .mv{text-align:right;font-weight:600}
+    .mv.em{font-weight:800;color:#000;text-transform:uppercase}
+    table.items{width:100%;border-collapse:collapse;margin:2px 0 6px}
+    .items th{background:#1c1c1c;color:#fff;text-align:left;padding:6px 8px;font-size:9.2px;font-weight:700;
+      letter-spacing:.4px;text-transform:uppercase}
+    .items td{padding:4.5px 8px;border-bottom:1px solid #e3e6ec;vertical-align:top;font-size:10.2px}
+    .c-item{width:6%}.c-hsn{width:11%}.c-desc{width:45%}.c-rate{width:12%;text-align:right}
+    .c-qty{width:9%;text-align:center}.c-amt{width:17%;text-align:right;font-weight:800;color:#111}
+    th.c-rate,th.c-amt{text-align:right;white-space:nowrap}th.c-qty{text-align:center}
+    .p-title{font-weight:800;color:#111}
+    .p-note{color:#7c8699;font-size:9.5px;margin-top:2px;line-height:1.3;max-width:430px}
+    .qty-sub{color:#555;font-size:9.7px;margin-top:2px}
+    .bottom{display:grid;grid-template-columns:1.15fr 1fr;gap:14px;margin-bottom:6px;page-break-inside:avoid}
+    .clause{margin:4px 0;font-size:9.5px;color:#333;line-height:1.32}
+    .clause b{color:#000;text-transform:uppercase}
+    .clause::before{content:"*";color:#1899d3;font-weight:800;font-size:15px;margin-right:6px;vertical-align:-1px}
+    .sum .srow{display:flex;justify-content:space-between;padding:4.5px 2px;font-size:10.6px;color:#333;white-space:nowrap}
+    .sum .srow b{color:#111}
+    .cifbar{display:flex;justify-content:space-between;align-items:center;gap:14px;background:#1899d3;color:#fff;
+      font-weight:800;font-size:12px;padding:7px 12px;border-radius:5px;margin-top:5px;white-space:nowrap}
+    .bank{background:#eaf7ee;border:1px solid #cde8d5;border-radius:8px;padding:7px 11px;margin-bottom:7px;
+      page-break-inside:avoid}
+    .bank h4{color:#1e6b3a;font-size:9.4px;letter-spacing:.7px;text-transform:uppercase;font-weight:800;
+      border-bottom:1px solid #cde8d5;padding-bottom:4px;margin-bottom:5px}
+    .bank .br{display:grid;grid-template-columns:130px 1fr;padding:1px 0;font-size:10.3px}
+    .bank .bl{font-weight:700;color:#111}
+    .bank .bv{color:#1c1c1c;letter-spacing:.3px}
+    .wordsbar{background:#e9edf5;border-radius:5px;padding:5px 12px;font-size:9.8px;color:#222;margin-bottom:6px;text-transform:uppercase}
+    .notif{text-align:center;color:#777;font-size:9.4px;font-weight:600;letter-spacing:.3px;margin:4px 0 2px}
+    .sign{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:12px;page-break-inside:avoid}
+    .sign .sc{text-align:center}
+    .sign .line{border-top:1.5px solid #1c1c1c;padding-top:5px;font-weight:700;font-size:11px}
+    .sign .cap{font-size:10px;color:#666;margin-top:2px}
+    @media print{
+      body{padding:12px 26px;zoom:.87}
+      .sign{margin-top:30px}
+      @page{margin:9mm}
+    }
+  </style></head><body>
+  <div class="hd">
+    <div class="badge">PROFORMA INVOICE</div>
+    <div class="co">
+      <div class="co-name">${CO.name}</div>
+      <div class="co-sub">Hitech Pumps and Motors Division</div>
+      <p>${CO.a1}</p>
+      <p>${CO.a2}</p>
+      <p>Contact: ${COX.phone} | Email: ${COX.email}</p>
+      <p class="iec">Export IEC No: ${COX.iec} &nbsp;|&nbsp; GSTIN: ${CO.gstin}</p>
+      <div class="tag">${COX.tagline}</div>
+    </div>
+  </div>
+  <div class="divider"></div>
+  <div class="two">
+    <div class="box">
+      <div class="bh">Overseas Buyer / Consignee</div>
+      <div class="buyer-name">${d.bname||""}</div>
+      ${d.baddr?`<div class="buyer-line">${String(d.baddr).replace(/\n/g,"<br>")}</div>`:""}
+      ${d.bphone?`<div class="buyer-line">${d.bphone}</div>`:""}
+      ${d.bemail?`<div class="buyer-email">${d.bemail}</div>`:""}
+      <div class="buyer-tax">Tax ID/VAT No: ${d.btax||"___________"}</div>
+    </div>
+    <div class="box">
+      <div class="bh">Filing &amp; Logistics Control</div>
+      <div class="mr"><span class="ml">Proforma Invoice No:</span><span class="mv em">${d.profNo||""}</span></div>
+      <div class="mr"><span class="ml">Date of Issue:</span><span class="mv">${fmtDateExport(d.date)}</span></div>
+      <div class="mr"><span class="ml">Mode of Shipment:</span><span class="mv em">${d.mode||""}</span></div>
+      <div class="mr"><span class="ml">Port of Loading:</span><span class="mv em">${d.pol||""}</span></div>
+      <div class="mr"><span class="ml">Port of Discharge:</span><span class="mv em">${d.pod||""}</span></div>
+    </div>
+  </div>
+  <table class="items">
+    <thead><tr>
+      <th class="c-item">Item</th><th class="c-hsn">Export HSN</th>
+      <th class="c-desc">Description of Industrial Mechanical Equipment</th>
+      <th class="c-rate">Unit Price ($)</th><th class="c-qty">Qty</th><th class="c-amt">Total FOB ($)</th>
+    </tr></thead>
+    <tbody>${prods}</tbody>
+  </table>
+  <div class="bottom">
+    <div class="box">
+      <div class="bh">International Supply Clauses &amp; Delivery Framework</div>
+      <div class="clause"><b>Payment Mandate:</b><br>${d.pay||""}</div>
+      <div class="clause"><b>Incoterms Delivery:</b><br>${d.inco||""}</div>
+      <div class="clause"><b>Commercial Guarantee:</b><br>${d.guar||""}</div>
+    </div>
+    <div class="sum">
+      <div class="srow"><span>Total Product Value (FOB India)</span><b>${usd(d.fob)}</b></div>
+      <div class="srow"><span>Consolidated Freight Charges</span><b>${usd(d.freight)}</b></div>
+      <div class="srow"><span>Marine Cargo Insurance Value</span><b>${usd(d.ins)}</b></div>
+      <div class="cifbar"><span>Total CIF Payable Value (USD)</span><span>${usd(d.cif)}</span></div>
+    </div>
+  </div>
+  <div class="bank">
+    <h4>Beneficiary International Wire Clearing Registry</h4>
+    <div class="br"><span class="bl">Bank Name:</span><span class="bv">${COX.bankName}</span></div>
+    <div class="br"><span class="bl">Branch Address:</span><span class="bv">${COX.bankBranch}</span></div>
+    <div class="br"><span class="bl">Account Name:</span><span class="bv">${COX.bankAcctName}</span></div>
+    <div class="br"><span class="bl">Account Number:</span><span class="bv">${COX.bankAcct}</span></div>
+    <div class="br"><span class="bl">SWIFT Code:</span><span class="bv">${COX.bankSwift}</span></div>
+    <div class="br"><span class="bl">IFSC Code:</span><span class="bv">${COX.bankIfsc}</span></div>
+    <div class="br"><span class="bl">Dealer Code:</span><span class="bv">${COX.bankDealer}</span></div>
+    <div class="br"><span class="bl">AD Code:</span><span class="bv">${COX.bankAd}</span></div>
+  </div>
+  <div class="wordsbar"><b>Amount In Words:</b> ${d.amtWords||usdToWords(d.cif||0)}</div>
+  <div class="notif">--- NOTIFICATION: THIS PROFORMA SERVES AS A BINDING SETTLEMENT BASE FOR BANK WIRE ROUTING ---</div>
+  <div class="sign">
+    <div class="sc"><div class="line">Overseas Buyer Acceptance Sanction</div><div class="cap">Authorized Signature &amp; Corporate Seal with Date</div></div>
+    <div class="sc"><div class="line">For, ${CO.name}</div><div class="cap">Authorized Export Execution Management</div></div>
+  </div>
+  </body></html>`;
+}
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a23b2f49f96e3d24',t:'MTc4NTQ4NjAzNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body></html>
+</body></html>
